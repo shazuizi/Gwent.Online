@@ -16,7 +16,7 @@ namespace Gwent.Client.Wpf
 		private GameState? _gameState;
 
 		// Na razie na sztywno: zmień na "P2" w drugim kliencie
-		private string _playerId = "P1";
+		private string _playerId = "P2";
 
 		public MainWindow()
 		{
@@ -30,7 +30,7 @@ namespace Gwent.Client.Wpf
 			{
 				_client = new TcpClient();
 				// jeśli serwer na tym samym kompie:
-				await _client.ConnectAsync("127.0.0.1", 9000);
+				await _client.ConnectAsync("192.168.1.12", 9000);
 				_stream = _client.GetStream();
 				TxtStatus.Text = "Połączono z serwerem.";
 
@@ -41,7 +41,6 @@ namespace Gwent.Client.Wpf
 				TxtStatus.Text = "Błąd połączenia: " + ex.Message;
 			}
 		}
-
 		private async Task ReceiveLoop()
 		{
 			if (_stream == null) return;
