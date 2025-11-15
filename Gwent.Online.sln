@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.12.35527.113
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gwent.Server", "Gwent.Server\Gwent.Server.csproj", "{58BE573D-FABE-4949-8B82-D30AB3DB9FE7}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gwent.Core", "Gwent.Core\Gwent.Core.csproj", "{07176B03-8558-4FC9-8036-17E2F1BFCFD0}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gwent.Client.Wpf", "Gwent.Client.Wpf\Gwent.Client.Wpf.csproj", "{1825417F-B2A1-48B7-B6CD-2CBB61D088EE}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{58BE573D-FABE-4949-8B82-D30AB3DB9FE7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{58BE573D-FABE-4949-8B82-D30AB3DB9FE7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{58BE573D-FABE-4949-8B82-D30AB3DB9FE7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{58BE573D-FABE-4949-8B82-D30AB3DB9FE7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{07176B03-8558-4FC9-8036-17E2F1BFCFD0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{07176B03-8558-4FC9-8036-17E2F1BFCFD0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{07176B03-8558-4FC9-8036-17E2F1BFCFD0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{07176B03-8558-4FC9-8036-17E2F1BFCFD0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1825417F-B2A1-48B7-B6CD-2CBB61D088EE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1825417F-B2A1-48B7-B6CD-2CBB61D088EE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1825417F-B2A1-48B7-B6CD-2CBB61D088EE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1825417F-B2A1-48B7-B6CD-2CBB61D088EE}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
