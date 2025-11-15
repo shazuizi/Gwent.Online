@@ -15,12 +15,19 @@ namespace Gwent.Client.Wpf
 		private NetworkStream? _stream;
 		private GameState? _gameState;
 
-		// Na razie na sztywno: zmień na "P2" w drugim kliencie
-		private string _playerId = "P1";
+		private readonly string _nick;
+		private readonly string _serverAddress;
+		private readonly int _port;
 
-		public MainWindow()
+		public MainWindow(string nick, string serverAddress, int port)
 		{
 			InitializeComponent();
+
+			_nick = nick;
+			_serverAddress = serverAddress;
+			_port = port;
+
+			Title = $"Gwint Online – {_nick}";
 			ConnectToServer();
 		}
 
@@ -29,10 +36,19 @@ namespace Gwent.Client.Wpf
 			try
 			{
 				_client = new TcpClient();
-				// jeśli serwer na tym samym kompie:
-				await _client.ConnectAsync("127.0.0.1", 9000);
+				await _client.ConnectAsync(_serverAddress, _port);
 				_stream = _client.GetStream();
-				TxtStatus.Text = "Połączono z serwerem.";
+				TxtStatus.Text = $"Połączono z serwerem {_serverAddress}:{_port}";
+
+				// wysyłamy JOIN z nickiem
+				var joinMsg = new NetMessage
+				{
+					Type = "join",
+					Nick = _nick
+				};
+				var jsonJoin = JsonSerializer.Serialize(joinMsg);
+				var bytesJoin = Encoding.UTF8.GetBytes(jsonJoin);
+				await _stream.WriteAsync(bytesJoin);
 
 				_ = ReceiveLoop();
 			}
@@ -54,7 +70,7 @@ namespace Gwent.Client.Wpf
 				try
 				{
 					bytes = await _stream.ReadAsync(buffer);
-					if (bytes == 0) break; // serwer rozłączył
+					if (bytes == 0) break;
 				}
 				catch
 				{
@@ -90,27 +106,34 @@ namespace Gwent.Client.Wpf
 		{
 			if (_gameState == null) return;
 
-			var me = _gameState.Player1.PlayerId == _playerId
-				? _gameState.Player1
-				: _gameState.Player2;
+			// ustalamy, który gracz to "ja" po nicku
+			PlayerState me, opp;
 
-			// Ręka
+			if (string.Equals(_gameState.Player1.Name, _nick, StringComparison.OrdinalIgnoreCase))
+			{
+				me = _gameState.Player1;
+				opp = _gameState.Player2;
+			}
+			else
+			{
+				me = _gameState.Player2;
+				opp = _gameState.Player1;
+			}
+
 			HandList.ItemsSource = null;
 			HandList.ItemsSource = me.Hand;
 
-			// Status
 			TxtStatus.Text =
-				$"Runda: {_gameState.RoundNumber} | Tura: {_gameState.CurrentPlayerId} | " +
-				$"HP: P1={_gameState.Player1.Lives} P2={_gameState.Player2.Lives}";
+				$"Runda: {_gameState.RoundNumber} | Tura: {_gameState.CurrentPlayerId} " +
+				$"| Ty: {me.Name} (HP: {me.Lives}) vs {opp.Name} (HP: {opp.Lives})";
 
-			// Stół (pokazujemy tylko swoje karty – na start)
 			var meleeRow = _gameState.Board.Rows.First(r => r.Row == Row.Melee);
 			var rangedRow = _gameState.Board.Rows.First(r => r.Row == Row.Ranged);
 			var siegeRow = _gameState.Board.Rows.First(r => r.Row == Row.Siege);
 
-			var myMelee = _gameState.Player1.PlayerId == _playerId ? meleeRow.Player1Cards : meleeRow.Player2Cards;
-			var myRanged = _gameState.Player1.PlayerId == _playerId ? rangedRow.Player1Cards : rangedRow.Player2Cards;
-			var mySiege = _gameState.Player1.PlayerId == _playerId ? siegeRow.Player1Cards : siegeRow.Player2Cards;
+			var myMelee = (me == _gameState.Player1) ? meleeRow.Player1Cards : meleeRow.Player2Cards;
+			var myRanged = (me == _gameState.Player1) ? rangedRow.Player1Cards : rangedRow.Player2Cards;
+			var mySiege = (me == _gameState.Player1) ? siegeRow.Player1Cards : siegeRow.Player2Cards;
 
 			BoardMelee.ItemsSource = myMelee.Select(c => c.ToString());
 			BoardRanged.ItemsSource = myRanged.Select(c => c.ToString());
@@ -125,9 +148,8 @@ namespace Gwent.Client.Wpf
 			var msg = new NetMessage
 			{
 				Type = "playCard",
-				PlayerId = _playerId,
 				CardId = card.Id,
-				TargetRow = card.Row  // na razie automatycznie w odpowiedni rząd
+				TargetRow = card.Row
 			};
 
 			var json = JsonSerializer.Serialize(msg);
@@ -141,8 +163,7 @@ namespace Gwent.Client.Wpf
 
 			var msg = new NetMessage
 			{
-				Type = "pass",
-				PlayerId = _playerId
+				Type = "pass"
 			};
 
 			var json = JsonSerializer.Serialize(msg);
