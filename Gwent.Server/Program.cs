@@ -56,13 +56,22 @@ class Program
 			{
 				break;
 			}
-
+			//Obsługa wiadomości
 			var json = Encoding.UTF8.GetString(buffer, 0, bytes);
 			var msg = JsonSerializer.Deserialize<NetMessage>(json);
-
 			if (msg == null) continue;
 
-			if (msg.Type == "playCard" && msg.CardId != null)
+			if (msg.Type == "join" && !string.IsNullOrWhiteSpace(msg.Nick))
+			{
+				// Ustawiamy nick gracza po stronie serwera
+				if (playerId == "P1")
+					gameState.Player1.Name = msg.Nick;
+				else
+					gameState.Player2.Name = msg.Nick;
+
+				Console.WriteLine($"Gracz {playerId} podał nick: {msg.Nick}");
+			}
+			else if (msg.Type == "playCard" && msg.CardId != null)
 			{
 				bool ok = GameLogic.PlayCard(gameState, playerId, msg.CardId, msg.TargetRow);
 				if (!ok)
@@ -75,7 +84,9 @@ class Program
 				GameLogic.Pass(gameState, playerId);
 			}
 
+			// Po każdej akcji odświeżamy stan u obu
 			await SendStateToAll(allClients, gameState);
+
 		}
 	}
 
