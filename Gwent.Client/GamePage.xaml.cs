@@ -23,6 +23,7 @@ namespace Gwent.Client
 
 		private PendingTargetType pendingTargetType = PendingTargetType.None;
 		private GwentCard? pendingSourceCard;
+		private System.Windows.Point dragStartPoint;
 
 		public GamePage(MainWindow mainWindow, GameClientController gameClientController)
 		{
@@ -272,9 +273,6 @@ namespace Gwent.Client
 
 		private async void PlayCardButton_Click(object sender, RoutedEventArgs e)
 		{
-			if (gameClientController.CurrentBoardState == null)
-				return;
-
 			var selectedCard = HandListBox.SelectedItem as GwentCard;
 			if (selectedCard == null)
 			{
@@ -282,6 +280,19 @@ namespace Gwent.Client
 					MessageBoxButton.OK, MessageBoxImage.Information);
 				return;
 			}
+
+			await TryPlayCardAsync(selectedCard, null);
+		}
+
+		/// <summary>
+		/// Wspólna logika zagrywania karty z UI (przycisk Play lub drag&drop).
+		/// targetRowOverride – rząd, na który upuszczono kartę (dla drag&drop),
+		/// null – użyj domyślnej logiki (jak przy kliknięciu).
+		/// </summary>
+		private async System.Threading.Tasks.Task TryPlayCardAsync(GwentCard selectedCard, CardRow? targetRowOverride)
+		{
+			if (gameClientController.CurrentBoardState == null)
+				return;
 
 			var boardState = gameClientController.CurrentBoardState;
 
@@ -304,7 +315,19 @@ namespace Gwent.Client
 				return;
 			}
 
-			// targetowalne:
+			// wymuszony mulligan – nie pozwalamy grać kart
+			bool isMulliganPhaseForLocal =
+				boardState.CurrentRoundNumber == 1 &&
+				localBoard.MulligansRemaining > 0;
+
+			if (isMulliganPhaseForLocal)
+			{
+				MessageBox.Show("You must finish your mulligans before playing cards.", "Info",
+					MessageBoxButton.OK, MessageBoxImage.Information);
+				return;
+			}
+
+			// targetowane zdolności – to zostawiamy jak było (Medic / Decoy / Mardroeme)
 			if (selectedCard.HasAbility(CardAbilityType.Medic))
 			{
 				if (!localBoard.Graveyard.Any(c => c.Category == CardCategory.Unit && !c.IsHero))
@@ -363,16 +386,57 @@ namespace Gwent.Client
 				return;
 			}
 
+			// ustalenie docelowego rzędu:
+			CardRow? targetRowToSend = targetRowOverride;
+
+			// jeśli karta Agile i nie przyszło override (klik Play), możesz tu później dorobić popup Melee/Ranged
+			if (targetRowToSend == null && selectedCard.DefaultRow == CardRow.Agile)
+			{
+				targetRowToSend = CardRow.Melee; // tymczasowy wybór
+			}
+
 			var actionPayload = new GameActionPayload
 			{
 				ActionType = GameActionType.PlayCard,
 				ActingPlayerNickname = localBoard.PlayerNickname,
 				CardInstanceId = selectedCard.InstanceId,
-				TargetRow = selectedCard.DefaultRow == CardRow.Agile ? CardRow.Melee : null
+				TargetRow = targetRowToSend
 			};
 
 			await gameClientController.SendGameActionAsync(actionPayload);
 		}
+
+		private void HandListBox_PreviewMouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+		{
+			dragStartPoint = e.GetPosition(null);
+		}
+
+		private void HandListBox_PreviewMouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+		{
+			if (e.LeftButton != System.Windows.Input.MouseButtonState.Pressed)
+				return;
+
+			System.Windows.Point mousePos = e.GetPosition(null);
+			Vector diff = mousePos - dragStartPoint;
+
+			if (Math.Abs(diff.X) < SystemParameters.MinimumHorizontalDragDistance &&
+				Math.Abs(diff.Y) < SystemParameters.MinimumVerticalDragDistance)
+			{
+				return;
+			}
+
+			var listBox = sender as ListBox;
+			if (listBox == null)
+				return;
+
+			var card = listBox.SelectedItem as GwentCard;
+			if (card == null)
+				return;
+
+			var data = new DataObject("GwentCard", card);
+			DragDrop.DoDragDrop(listBox, data, DragDropEffects.Move);
+		}
+
 
 		private async void MulliganButton_Click(object sender, RoutedEventArgs e)
 		{
@@ -581,5 +645,52 @@ namespace Gwent.Client
 
 			await gameClientController.SendGameActionAsync(actionPayload);
 		}
+		private void RowListBox_DragOver(object sender, DragEventArgs e)
+		{
+			if (e.Data.GetDataPresent("GwentCard"))
+			{
+				e.Effects = DragDropEffects.Move;
+			}
+			else
+			{
+				e.Effects = DragDropEffects.None;
+			}
+			e.Handled = true;
+		}
+
+		private async void RowListBox_Drop(object sender, DragEventArgs e)
+		{
+			if (!e.Data.GetDataPresent("GwentCard"))
+				return;
+
+			var card = e.Data.GetData("GwentCard") as GwentCard;
+			if (card == null)
+				return;
+
+			var listBox = sender as ListBox;
+			if (listBox == null)
+				return;
+
+			// odczyt rzędu z Tag w XAML
+			CardRow? targetRow = null;
+			if (listBox.Tag is string rowTag)
+			{
+				switch (rowTag)
+				{
+					case "Melee":
+						targetRow = CardRow.Melee;
+						break;
+					case "Ranged":
+						targetRow = CardRow.Ranged;
+						break;
+					case "Siege":
+						targetRow = CardRow.Siege;
+						break;
+				}
+			}
+
+			await TryPlayCardAsync(card, targetRow);
+		}
+
 	}
 }

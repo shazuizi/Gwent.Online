@@ -137,8 +137,13 @@
                         </StackPanel>
                     </GroupBox.Header>
                     <ListBox x:Name="LocalMeleeRowListBox"
-                             DisplayMemberPath="Name"
-                             SelectionChanged="LocalBoardRow_SelectionChanged" />
+                         DisplayMemberPath="Name"
+                         SelectionChanged="LocalBoardRow_SelectionChanged"
+                         AllowDrop="True"
+                         Tag="Melee"
+                         DragOver="RowListBox_DragOver"
+                         Drop="RowListBox_Drop"/>
+
                 </GroupBox>
 
                 <GroupBox Grid.Row="1" Margin="0,0,0,5">
@@ -151,8 +156,13 @@
                         </StackPanel>
                     </GroupBox.Header>
                     <ListBox x:Name="LocalRangedRowListBox"
-                             DisplayMemberPath="Name"
-                             SelectionChanged="LocalBoardRow_SelectionChanged" />
+                         DisplayMemberPath="Name"
+                         SelectionChanged="LocalBoardRow_SelectionChanged"
+                         AllowDrop="True"
+                         Tag="Ranged"
+                         DragOver="RowListBox_DragOver"
+                         Drop="RowListBox_Drop"/>
+
                 </GroupBox>
 
                 <GroupBox Grid.Row="2">
@@ -165,8 +175,13 @@
                         </StackPanel>
                     </GroupBox.Header>
                     <ListBox x:Name="LocalSiegeRowListBox"
-                             DisplayMemberPath="Name"
-                             SelectionChanged="LocalBoardRow_SelectionChanged" />
+                         DisplayMemberPath="Name"
+                         SelectionChanged="LocalBoardRow_SelectionChanged"
+                         AllowDrop="True"
+                         Tag="Siege"
+                         DragOver="RowListBox_DragOver"
+                         Drop="RowListBox_Drop"/>
+
                 </GroupBox>
             </Grid>
 
@@ -183,8 +198,11 @@
         <DockPanel Grid.Row="2">
             <GroupBox Header="Your hand" DockPanel.Dock="Top" Margin="0,0,10,0">
                 <ListBox x:Name="HandListBox"
-                         DisplayMemberPath="Name"
-                         Height="100"/>
+                     DisplayMemberPath="Name"
+                     Height="100"
+                     PreviewMouseLeftButtonDown="HandListBox_PreviewMouseLeftButtonDown"
+                     PreviewMouseMove="HandListBox_PreviewMouseMove"/>
+
             </GroupBox>
 
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
