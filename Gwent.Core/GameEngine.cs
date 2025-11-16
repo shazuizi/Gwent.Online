@@ -8,8 +8,6 @@ namespace Gwent.Core
 	{
 		private readonly Random random = new Random();
 
-		private bool mainPhaseStarted;
-
 		public GameBoardState BoardState { get; private set; } = new GameBoardState();
 
 		public void InitializeNewGame(GameSessionConfiguration sessionConfiguration)
@@ -71,22 +69,18 @@ namespace Gwent.Core
 					break;
 
 				case GameActionType.PlayCard:
-					mainPhaseStarted = true;
 					ApplyPlayCardAction(action);
 					break;
 
 				case GameActionType.PassTurn:
-					mainPhaseStarted = true;
 					ApplyPassTurnAction(action);
 					break;
 
 				case GameActionType.Resign:
-					mainPhaseStarted = true;
 					ApplyResignAction(action);
 					break;
 
 				case GameActionType.UseLeaderAbility:
-					mainPhaseStarted = true;
 					ApplyLeaderAbilityAction(action);
 					break;
 			}
@@ -346,28 +340,37 @@ namespace Gwent.Core
 
 		private void ApplyMulliganAction(GameActionPayload action)
 		{
-			if (BoardState.CurrentRoundNumber != 1 || mainPhaseStarted)
+			// Mulligan tylko w 1 rundzie.
+			if (BoardState.CurrentRoundNumber != 1)
+			{
 				return;
+			}
 
 			var player = GetPlayerBoard(action.ActingPlayerNickname);
 			if (player.MulligansRemaining <= 0 || action.CardInstanceId == null)
+			{
 				return;
+			}
 
 			var card = player.Hand.FirstOrDefault(c => c.InstanceId == action.CardInstanceId);
 			if (card == null || player.Deck.Count == 0)
+			{
 				return;
+			}
 
+			// wrzucamy kartę z ręki losowo do talii
 			player.Hand.Remove(card);
-
 			int insertIndex = random.Next(player.Deck.Count + 1);
 			player.Deck.Insert(insertIndex, card);
 
+			// dobieramy nową
 			DrawFromDeck(player, 1);
 
 			player.MulligansRemaining--;
 
 			RecalculateStrengths();
 		}
+
 
 		#endregion
 
@@ -377,6 +380,11 @@ namespace Gwent.Core
 		{
 			var actingPlayer = GetPlayerBoard(action.ActingPlayerNickname);
 			var opponent = GetOpponentBoard(action.ActingPlayerNickname);
+
+			if (BoardState.CurrentRoundNumber == 1 && actingPlayer.MulligansRemaining > 0)
+			{
+				return;
+			}
 
 			if (actingPlayer.HasPassedCurrentRound)
 				return;
@@ -591,6 +599,13 @@ namespace Gwent.Core
 		private void ApplyPassTurnAction(GameActionPayload action)
 		{
 			var player = GetPlayerBoard(action.ActingPlayerNickname);
+
+			if (BoardState.CurrentRoundNumber == 1 && player.MulligansRemaining > 0)
+			{
+				// nie możesz passować zanim nie wymienisz 2 kart
+				return;
+			}
+
 			if (player.HasPassedCurrentRound)
 				return;
 
@@ -611,6 +626,13 @@ namespace Gwent.Core
 		private void ApplyResignAction(GameActionPayload action)
 		{
 			var player = GetPlayerBoard(action.ActingPlayerNickname);
+
+			if (BoardState.CurrentRoundNumber == 1 && player.MulligansRemaining > 0)
+			{
+				// możesz wymusić też, że nie wolno się poddać w fazie mulliganu
+				return;
+			}
+
 			var opponent = GetOpponentBoard(action.ActingPlayerNickname);
 
 			BoardState.IsGameFinished = true;
@@ -622,6 +644,13 @@ namespace Gwent.Core
 		private void ApplyLeaderAbilityAction(GameActionPayload action)
 		{
 			var player = GetPlayerBoard(action.ActingPlayerNickname);
+
+			if (BoardState.CurrentRoundNumber == 1 && player.MulligansRemaining > 0)
+			{
+				// najpierw wykorzystaj mulligany
+				return;
+			}
+
 			if (player.LeaderCard == null || player.LeaderAbilityUsed)
 				return;
 
@@ -697,7 +726,6 @@ namespace Gwent.Core
 
 			BoardState.WeatherCards.Clear();
 			BoardState.CurrentRoundNumber++;
-			mainPhaseStarted = false;
 
 			if (!BoardState.IsGameFinished)
 				BoardState.ActivePlayerNickname = host.PlayerNickname;

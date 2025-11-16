@@ -200,7 +200,17 @@ namespace Gwent.Client
 			HandListBox.ItemsSource = localBoard.Hand;
 
 			bool isLocalTurn = boardState.ActivePlayerNickname == localBoard.PlayerNickname;
-			bool canPlayOrPass = isLocalTurn && !localBoard.HasPassedCurrentRound && !boardState.IsGameFinished;
+
+			bool isGlobalMulliganPhase =
+				boardState.CurrentRoundNumber == 1 &&
+				(boardState.HostPlayerBoard.MulligansRemaining > 0 ||
+				 boardState.GuestPlayerBoard.MulligansRemaining > 0);
+
+
+			bool canPlayOrPass =
+				isLocalTurn &&
+				!localBoard.HasPassedCurrentRound &&
+				!boardState.IsGameFinished;
 
 			PlayCardButton.IsEnabled = canPlayOrPass;
 			PassButton.IsEnabled = canPlayOrPass;
@@ -215,6 +225,7 @@ namespace Gwent.Client
 				!localBoard.LeaderAbilityUsed &&
 				!boardState.IsGameFinished &&
 				isLocalTurn;
+
 
 			SurrenderButton.IsEnabled = !boardState.IsGameFinished;
 
