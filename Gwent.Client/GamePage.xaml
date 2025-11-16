@@ -88,7 +88,9 @@
                         </StackPanel>
                     </GroupBox.Header>
                     <ListBox x:Name="OpponentMeleeRowListBox"
-                             DisplayMemberPath="Name" />
+                         DisplayMemberPath="Name"
+                         Tag="Melee"
+                         SelectionChanged="OpponentBoardRow_SelectionChanged"/>
                 </GroupBox>
 
                 <GroupBox Grid.Row="1" Margin="0,0,0,5">
@@ -101,7 +103,10 @@
                         </StackPanel>
                     </GroupBox.Header>
                     <ListBox x:Name="OpponentRangedRowListBox"
-                             DisplayMemberPath="Name" />
+                         DisplayMemberPath="Name"
+                         Tag="Ranged"
+                         SelectionChanged="OpponentBoardRow_SelectionChanged"/>
+
                 </GroupBox>
 
                 <GroupBox Grid.Row="2">
@@ -114,7 +119,10 @@
                         </StackPanel>
                     </GroupBox.Header>
                     <ListBox x:Name="OpponentSiegeRowListBox"
-                             DisplayMemberPath="Name" />
+                         DisplayMemberPath="Name"
+                         Tag="Siege"
+                         SelectionChanged="OpponentBoardRow_SelectionChanged"/>
+
                 </GroupBox>
             </Grid>
 
@@ -138,11 +146,9 @@
                     </GroupBox.Header>
                     <ListBox x:Name="LocalMeleeRowListBox"
                          DisplayMemberPath="Name"
-                         SelectionChanged="LocalBoardRow_SelectionChanged"
-                         AllowDrop="True"
                          Tag="Melee"
-                         DragOver="RowListBox_DragOver"
-                         Drop="RowListBox_Drop"/>
+                         SelectionChanged="LocalBoardRow_SelectionChanged"/>
+
 
                 </GroupBox>
 
@@ -157,11 +163,9 @@
                     </GroupBox.Header>
                     <ListBox x:Name="LocalRangedRowListBox"
                          DisplayMemberPath="Name"
-                         SelectionChanged="LocalBoardRow_SelectionChanged"
-                         AllowDrop="True"
                          Tag="Ranged"
-                         DragOver="RowListBox_DragOver"
-                         Drop="RowListBox_Drop"/>
+                         SelectionChanged="LocalBoardRow_SelectionChanged"/>
+
 
                 </GroupBox>
 
@@ -176,11 +180,8 @@
                     </GroupBox.Header>
                     <ListBox x:Name="LocalSiegeRowListBox"
                          DisplayMemberPath="Name"
-                         SelectionChanged="LocalBoardRow_SelectionChanged"
-                         AllowDrop="True"
                          Tag="Siege"
-                         DragOver="RowListBox_DragOver"
-                         Drop="RowListBox_Drop"/>
+                         SelectionChanged="LocalBoardRow_SelectionChanged"/>
 
                 </GroupBox>
             </Grid>
@@ -200,8 +201,8 @@
                 <ListBox x:Name="HandListBox"
                      DisplayMemberPath="Name"
                      Height="100"
-                     PreviewMouseLeftButtonDown="HandListBox_PreviewMouseLeftButtonDown"
-                     PreviewMouseMove="HandListBox_PreviewMouseMove"/>
+                     SelectionChanged="HandListBox_SelectionChanged"/>
+
 
             </GroupBox>
 
