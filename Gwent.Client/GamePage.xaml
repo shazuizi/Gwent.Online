@@ -9,11 +9,12 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Pasek z nickami i siłą -->
+        <!-- Pasek z nickami, rolami, siłą, życiami i rundą -->
         <Border Grid.Row="0" Padding="5" BorderThickness="0,0,0,1" BorderBrush="Gray">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
@@ -22,13 +23,24 @@
                     <TextBlock x:Name="LocalPlayerNicknameTextBlock"/>
                     <TextBlock x:Name="LocalPlayerRoleTextBlock" FontSize="11" Foreground="Gray"/>
                     <TextBlock x:Name="LocalPlayerStrengthTextBlock" FontSize="14" FontWeight="Bold"/>
+                    <TextBlock x:Name="LocalLivesTextBlock" FontSize="12"/>
+                    <TextBlock x:Name="LocalPassStatusTextBlock" FontSize="11" Foreground="DarkOrange"/>
                 </StackPanel>
 
-                <StackPanel Grid.Column="1" Orientation="Vertical" HorizontalAlignment="Right">
+                <StackPanel Grid.Column="1" Orientation="Vertical" HorizontalAlignment="Center">
+                    <TextBlock x:Name="RoundNumberTextBlock"
+                               FontWeight="Bold"
+                               FontSize="14"
+                               HorizontalAlignment="Center"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="2" Orientation="Vertical" HorizontalAlignment="Right">
                     <TextBlock Text="Opponent" FontWeight="Bold" HorizontalAlignment="Right"/>
                     <TextBlock x:Name="OpponentNicknameTextBlock" HorizontalAlignment="Right"/>
                     <TextBlock x:Name="OpponentRoleTextBlock" FontSize="11" Foreground="Gray" HorizontalAlignment="Right"/>
                     <TextBlock x:Name="OpponentStrengthTextBlock" FontSize="14" FontWeight="Bold" HorizontalAlignment="Right"/>
+                    <TextBlock x:Name="OpponentLivesTextBlock" FontSize="12" HorizontalAlignment="Right"/>
+                    <TextBlock x:Name="OpponentPassStatusTextBlock" FontSize="11" Foreground="DarkOrange" HorizontalAlignment="Right"/>
                 </StackPanel>
             </Grid>
         </Border>
@@ -100,7 +112,12 @@
                 <Button x:Name="PassButton"
                         Content="Pass"
                         Width="80"
+                        Margin="0,0,10,0"
                         Click="PassButton_Click"/>
+                <Button x:Name="SurrenderButton"
+                        Content="Surrender"
+                        Width="90"
+                        Click="SurrenderButton_Click"/>
             </StackPanel>
         </DockPanel>
     </Grid>

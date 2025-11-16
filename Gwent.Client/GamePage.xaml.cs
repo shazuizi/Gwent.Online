@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -8,12 +7,14 @@ using Gwent.Core;
 namespace Gwent.Client
 {
 	/// <summary>
-	/// Główna strona rozgrywki – pokazuje stan planszy i pozwala grać karty / passować turę.
+	/// Główna strona rozgrywki – pokazuje stan planszy i pozwala grać karty / passować / poddać grę.
 	/// </summary>
 	public partial class GamePage : Page
 	{
 		private readonly MainWindow mainWindow;
 		private readonly GameClientController gameClientController;
+
+		private bool gameResultAlreadyShown;
 
 		public GamePage(MainWindow mainWindow, GameClientController gameClientController)
 		{
@@ -50,9 +51,6 @@ namespace Gwent.Client
 			});
 		}
 
-		/// <summary>
-		/// Ustawia nicki i role graczy na podstawie konfiguracji sesji.
-		/// </summary>
 		private void UpdatePlayerNicknamesFromSessionConfiguration()
 		{
 			GameSessionConfiguration? sessionConfiguration = gameClientController.CurrentGameSessionConfiguration;
@@ -103,6 +101,7 @@ namespace Gwent.Client
 
 		/// <summary>
 		/// Odświeża UI planszy na podstawie aktualnego stanu w GameClientController.
+		/// Pokazuje rundy, życia, pass, siłę itd.
 		/// </summary>
 		private void UpdateBoardUi()
 		{
@@ -111,10 +110,17 @@ namespace Gwent.Client
 
 			if (boardState == null || sessionConfiguration == null)
 			{
-				// brak stanu – czyścimy listy
 				ClearAllListBoxes();
 				LocalPlayerStrengthTextBlock.Text = "Strength: 0";
 				OpponentStrengthTextBlock.Text = "Strength: 0";
+				RoundNumberTextBlock.Text = "Round -";
+				LocalLivesTextBlock.Text = "Lives: -";
+				OpponentLivesTextBlock.Text = "Lives: -";
+				LocalPassStatusTextBlock.Text = string.Empty;
+				OpponentPassStatusTextBlock.Text = string.Empty;
+				PlayCardButton.IsEnabled = false;
+				PassButton.IsEnabled = false;
+				SurrenderButton.IsEnabled = false;
 				return;
 			}
 
@@ -132,8 +138,15 @@ namespace Gwent.Client
 				opponentBoard = boardState.HostPlayerBoard;
 			}
 
+			RoundNumberTextBlock.Text = $"Round {boardState.CurrentRoundNumber}";
 			LocalPlayerStrengthTextBlock.Text = $"Strength: {localBoard.GetTotalStrength()}";
 			OpponentStrengthTextBlock.Text = $"Strength: {opponentBoard.GetTotalStrength()}";
+
+			LocalLivesTextBlock.Text = $"Lives: {localBoard.LifeTokensRemaining}";
+			OpponentLivesTextBlock.Text = $"Lives: {opponentBoard.LifeTokensRemaining}";
+
+			LocalPassStatusTextBlock.Text = localBoard.HasPassedCurrentRound ? "Passed" : string.Empty;
+			OpponentPassStatusTextBlock.Text = opponentBoard.HasPassedCurrentRound ? "Passed" : string.Empty;
 
 			LocalMeleeRowListBox.ItemsSource = localBoard.MeleeRow.Select(c => $"{c.Name} ({c.CurrentStrength})");
 			LocalRangedRowListBox.ItemsSource = localBoard.RangedRow.Select(c => $"{c.Name} ({c.CurrentStrength})");
@@ -144,6 +157,34 @@ namespace Gwent.Client
 			OpponentSiegeRowListBox.ItemsSource = opponentBoard.SiegeRow.Select(c => $"{c.Name} ({c.CurrentStrength})");
 
 			HandListBox.ItemsSource = localBoard.Hand;
+
+			bool isLocalTurn = boardState.ActivePlayerNickname == localBoard.PlayerNickname;
+			bool canPlayOrPass = isLocalTurn && !localBoard.HasPassedCurrentRound && !boardState.IsGameFinished;
+
+			PlayCardButton.IsEnabled = canPlayOrPass;
+			PassButton.IsEnabled = canPlayOrPass;
+			SurrenderButton.IsEnabled = !boardState.IsGameFinished;
+
+			if (boardState.IsGameFinished && !gameResultAlreadyShown && boardState.WinnerNickname != null)
+			{
+				gameResultAlreadyShown = true;
+
+				string message;
+				if (boardState.WinnerNickname == localBoard.PlayerNickname)
+				{
+					message = "You won the game!";
+				}
+				else
+				{
+					message = "You lost the game.";
+				}
+
+				MessageBox.Show(message, "Game finished", MessageBoxButton.OK, MessageBoxImage.Information);
+
+				mainWindow.CurrentGameClientController?.TryStopServerProcess();
+				mainWindow.CurrentGameClientController = null;
+				mainWindow.NavigateToMainMenuPage();
+			}
 		}
 
 		private void ClearAllListBoxes()
@@ -157,9 +198,6 @@ namespace Gwent.Client
 			HandListBox.ItemsSource = null;
 		}
 
-		/// <summary>
-		/// Obsługa przycisku "Play selected card" – wysyła GameAction do serwera.
-		/// </summary>
 		private async void PlayCardButton_Click(object sender, RoutedEventArgs e)
 		{
 			if (gameClientController.CurrentBoardState == null)
@@ -175,13 +213,8 @@ namespace Gwent.Client
 				return;
 			}
 
-			GameSessionConfiguration? sessionConfiguration = gameClientController.CurrentGameSessionConfiguration;
-			if (sessionConfiguration == null)
-			{
-				return;
-			}
-
 			GameBoardState boardState = gameClientController.CurrentBoardState;
+
 			PlayerBoardState localBoard =
 				gameClientController.LocalPlayerRole == GameRole.Host
 					? boardState.HostPlayerBoard
@@ -190,6 +223,13 @@ namespace Gwent.Client
 			if (boardState.ActivePlayerNickname != localBoard.PlayerNickname)
 			{
 				MessageBox.Show("It is not your turn.", "Info",
+					MessageBoxButton.OK, MessageBoxImage.Information);
+				return;
+			}
+
+			if (localBoard.HasPassedCurrentRound)
+			{
+				MessageBox.Show("You have already passed this round.", "Info",
 					MessageBoxButton.OK, MessageBoxImage.Information);
 				return;
 			}
@@ -205,9 +245,6 @@ namespace Gwent.Client
 			await gameClientController.SendGameActionAsync(actionPayload);
 		}
 
-		/// <summary>
-		/// Obsługa przycisku "Pass" – wysyła akcję PassTurn.
-		/// </summary>
 		private async void PassButton_Click(object sender, RoutedEventArgs e)
 		{
 			if (gameClientController.CurrentBoardState == null)
@@ -229,9 +266,50 @@ namespace Gwent.Client
 				return;
 			}
 
+			if (localBoard.HasPassedCurrentRound)
+			{
+				MessageBox.Show("You have already passed this round.", "Info",
+					MessageBoxButton.OK, MessageBoxImage.Information);
+				return;
+			}
+
 			GameActionPayload actionPayload = new GameActionPayload
 			{
 				ActionType = GameActionType.PassTurn,
+				ActingPlayerNickname = localBoard.PlayerNickname
+			};
+
+			await gameClientController.SendGameActionAsync(actionPayload);
+		}
+
+		private async void SurrenderButton_Click(object sender, RoutedEventArgs e)
+		{
+			if (gameClientController.CurrentBoardState == null)
+			{
+				return;
+			}
+
+			GameBoardState boardState = gameClientController.CurrentBoardState;
+
+			PlayerBoardState localBoard =
+				gameClientController.LocalPlayerRole == GameRole.Host
+					? boardState.HostPlayerBoard
+					: boardState.GuestPlayerBoard;
+
+			var result = MessageBox.Show(
+				"Do you really want to surrender?",
+				"Confirm surrender",
+				MessageBoxButton.YesNo,
+				MessageBoxImage.Question);
+
+			if (result != MessageBoxResult.Yes)
+			{
+				return;
+			}
+
+			GameActionPayload actionPayload = new GameActionPayload
+			{
+				ActionType = GameActionType.Resign,
 				ActingPlayerNickname = localBoard.PlayerNickname
 			};
 
