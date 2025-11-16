@@ -678,6 +678,7 @@ namespace Gwent.Core
 
 			PlayerBoardState? roundWinner = null;
 			PlayerBoardState? roundLoser = null;
+			bool isTrueDraw = false;
 
 			if (hostStrength > guestStrength)
 			{
@@ -691,6 +692,7 @@ namespace Gwent.Core
 			}
 			else
 			{
+				// REMIS SIŁY – najpierw sprawdzamy bonus Nilfgaardu
 				if (host.Faction == FactionType.Nilfgaard && guest.Faction != FactionType.Nilfgaard)
 				{
 					roundWinner = host;
@@ -701,16 +703,42 @@ namespace Gwent.Core
 					roundWinner = guest;
 					roundLoser = host;
 				}
+				else
+				{
+					
+					isTrueDraw = true;
+				}
 			}
 
-			if (roundWinner != null && roundLoser != null)
+			if (isTrueDraw)
+			{
+				// OBAJ dostają punkt rundy i tracą jedno życie
+				host.RoundsWon++;
+				guest.RoundsWon++;
+
+				host.LifeTokensRemaining--;
+				guest.LifeTokensRemaining--;
+
+
+				// Remis całej gry – obaj zeszli do zera
+				if (host.LifeTokensRemaining <= 0 && guest.LifeTokensRemaining <= 0)
+				{
+					BoardState.IsGameFinished = true;
+					BoardState.WinnerNickname = null; // prawdziwy remis
+				}
+			}
+			else if (roundWinner != null && roundLoser != null)
 			{
 				roundWinner.RoundsWon++;
 				roundLoser.LifeTokensRemaining--;
 
+				// Northern Realms bonus – po wygranej rundzie dobierasz 1 kartę
 				if (roundWinner.Faction == FactionType.NorthernRealms)
+				{
 					DrawFromDeck(roundWinner, 1);
+				}
 
+				// przegrany spadł do 0 żyć → przegrana gry
 				if (roundLoser.LifeTokensRemaining <= 0)
 				{
 					BoardState.IsGameFinished = true;
@@ -718,6 +746,7 @@ namespace Gwent.Core
 				}
 			}
 
+			// dalej normalne zakończenie rundy
 			ClearRows(host);
 			ClearRows(guest);
 
@@ -727,11 +756,15 @@ namespace Gwent.Core
 			BoardState.WeatherCards.Clear();
 			BoardState.CurrentRoundNumber++;
 
+			// nowa runda startuje od hosta (prosto)
 			if (!BoardState.IsGameFinished)
+			{
 				BoardState.ActivePlayerNickname = host.PlayerNickname;
+			}
 
 			RecalculateStrengths();
 		}
+
 
 		private void ClearRows(PlayerBoardState player)
 		{
