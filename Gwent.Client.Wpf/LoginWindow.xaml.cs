@@ -1,14 +1,13 @@
 ﻿using System;
 using System.Diagnostics;
 using System.IO;
-using System.Text.Json;
 using System.Windows;
 
 namespace Gwent.Client.Wpf
 {
 	public partial class LoginWindow : Window
 	{
-		private const string ConfigFileName = "gwent_config.json";
+		private ClientConfig _config = null!;
 
 		public LoginWindow()
 		{
@@ -16,153 +15,90 @@ namespace Gwent.Client.Wpf
 			LoadConfig();
 		}
 
-		private string GetConfigPath()
-		{
-			var folder = Path.Combine(
-				Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-				"Gwent.Online");
-			Directory.CreateDirectory(folder);
-			return Path.Combine(folder, ConfigFileName);
-		}
-
 		private void LoadConfig()
 		{
-			try
-			{
-				var path = GetConfigPath();
-				if (!File.Exists(path)) return;
+			_config = ClientConfig.Load();
 
-				var json = File.ReadAllText(path);
-				var config = JsonSerializer.Deserialize<LoginConfig>(json);
-				if (config == null) return;
-
-				TxtNick.Text = config.Nick ?? "";
-				TxtAddress.Text = config.Address ?? "127.0.0.1";
-				TxtPort.Text = config.Port.ToString();
-
-				if (config.IsHost)
-				{
-					RbHost.IsChecked = true;
-					RbJoin.IsChecked = false;
-				}
-				else
-				{
-					RbHost.IsChecked = false;
-					RbJoin.IsChecked = true;
-				}
-			}
-			catch
-			{
-				// jak się coś wywali przy odczycie – ignorujemy
-			}
+			TxtNick.Text = _config.Nickname;
+			TxtAddress.Text = _config.ServerAddress;
+			TxtPort.Text = _config.ServerPort.ToString();
+			RbHost.IsChecked = _config.LastWasHost;
+			RbJoin.IsChecked = !_config.LastWasHost;
 		}
 
-		private void SaveConfig(LoginConfig config)
+		private void SaveConfig(bool isHost, string nick, string addr, int port)
 		{
-			try
-			{
-				var path = GetConfigPath();
-				var json = JsonSerializer.Serialize(config, new JsonSerializerOptions
-				{
-					WriteIndented = true
-				});
-				File.WriteAllText(path, json);
-			}
-			catch
-			{
-				// brak zapisu = przeżyjemy
-			}
+			_config.Nickname = nick;
+			_config.ServerAddress = addr;
+			_config.ServerPort = port;
+			_config.LastWasHost = isHost;
+			_config.Save();
 		}
 
-		private void Ok_Click(object sender, RoutedEventArgs e)
+		private void BtnCancel_Click(object sender, RoutedEventArgs e)
 		{
-			var nick = TxtNick.Text.Trim();
-			var addr = TxtAddress.Text.Trim();
-			var portText = TxtPort.Text.Trim();
+			Application.Current.Shutdown();
+		}
+
+		private void BtnOk_Click(object sender, RoutedEventArgs e)
+		{
+			bool isHost = RbHost.IsChecked == true;
+			string nick = TxtNick.Text.Trim();
+			string addr = TxtAddress.Text.Trim();
+			if (!int.TryParse(TxtPort.Text.Trim(), out int port))
+			{
+				MessageBox.Show("Nieprawidłowy port.", "Błąd", MessageBoxButton.OK, MessageBoxImage.Error);
+				return;
+			}
 
 			if (string.IsNullOrWhiteSpace(nick))
 			{
 				MessageBox.Show("Podaj nick.", "Błąd", MessageBoxButton.OK, MessageBoxImage.Error);
 				return;
 			}
+
 			if (string.IsNullOrWhiteSpace(addr))
 			{
-				MessageBox.Show("Podaj adres serwera.", "Błąd", MessageBoxButton.OK, MessageBoxImage.Error);
-				return;
-			}
-			if (!int.TryParse(portText, out var port) || port <= 0 || port > 65535)
-			{
-				MessageBox.Show("Nieprawidłowy port.", "Błąd", MessageBoxButton.OK, MessageBoxImage.Error);
-				return;
-			}
-
-			bool isHost = RbHost.IsChecked == true;
-
-			// zapis do configu
-			var cfg = new LoginConfig
-			{
-				Nick = nick,
-				Address = addr,
-				Port = port,
-				IsHost = isHost
-			};
-			SaveConfig(cfg);
-
-			if (isHost)
-			{
-				// HOST – odpalamy serwer na wybranym porcie (tylko jeśli nie działa)
-				try
-				{
-					StartServerProcess(port);
-				}
-				catch (Exception ex)
-				{
-					MessageBox.Show("Nie udało się uruchomić serwera:\n" + ex.Message,
-						"Błąd serwera", MessageBoxButton.OK, MessageBoxImage.Error);
-					return;
-				}
-
-				// jako host zwykle łączysz się na localhost
 				addr = "127.0.0.1";
 			}
 
-			// Tworzymy okno gry, przekazujemy nick, adres i port
+			SaveConfig(isHost, nick, addr, port);
+
+			if (isHost)
+			{
+				try
+				{
+					// ścieżka do serwera: ten sam folder, obok klienta – jeśli masz inaczej,
+					// dostosuj ścieżkę.
+					string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+					string serverPath = Path.Combine(baseDir, "..", "..", "..", "..",
+						"Gwent.Server", "bin", "Debug", "net8.0", "Gwent.Server.exe");
+
+					serverPath = Path.GetFullPath(serverPath);
+
+					var psi = new ProcessStartInfo
+					{
+						FileName = serverPath,
+						Arguments = port.ToString(),
+						UseShellExecute = false,
+						CreateNoWindow = false
+					};
+
+					Process.Start(psi);
+				}
+				catch (Exception ex)
+				{
+					MessageBox.Show("Nie udało się uruchomić serwera: " + ex.Message,
+						"Błąd", MessageBoxButton.OK, MessageBoxImage.Error);
+					return;
+				}
+			}
+
+			// uruchamiamy okno gry
 			var main = new MainWindow(nick, addr, port);
-			Application.Current.MainWindow = main;
 			main.Show();
 
-			Close();
+			this.Close();
 		}
-
-		private void StartServerProcess(int port)
-		{
-			// zakładamy, że Gwent.Server.exe jest obok klienta po publikacji
-			// w czasie developmentu możesz podać pełną ścieżkę do bin\Debug\net8.0\Gwent.Server.exe
-			var exeName = "Gwent.Server.exe";
-
-			var startInfo = new ProcessStartInfo
-			{
-				FileName = exeName,
-				Arguments = port.ToString(),
-				UseShellExecute = true,
-				WorkingDirectory = AppDomain.CurrentDomain.BaseDirectory,
-				CreateNoWindow = false
-			};
-
-			Process.Start(startInfo);
-		}
-
-		private void Cancel_Click(object sender, RoutedEventArgs e)
-		{
-			Application.Current.Shutdown();
-		}
-	}
-
-	public class LoginConfig
-	{
-		public string? Nick { get; set; }
-		public string? Address { get; set; }
-		public int Port { get; set; }
-		public bool IsHost { get; set; }
 	}
 }

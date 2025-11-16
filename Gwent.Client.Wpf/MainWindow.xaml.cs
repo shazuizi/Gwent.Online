@@ -13,41 +13,44 @@ namespace Gwent.Client.Wpf
 	{
 		private readonly string _nick;
 		private readonly string _serverAddress;
-		private readonly int _port;
+		private readonly int _serverPort;
 
 		private TcpClient? _client;
 		private NetworkStream? _stream;
 		private GameState? _gameState;
 
-		public MainWindow(string nick, string serverAddress, int port)
+		public MainWindow(string nick, string serverAddress, int serverPort)
 		{
+			InitializeComponent();
+
 			_nick = nick;
 			_serverAddress = serverAddress;
-			_port = port;
+			_serverPort = serverPort;
 
-			InitializeComponent();
-			TxtMeName.Text = _nick;
-			ConnectToServer();
+			Loaded += async (_, __) => await ConnectAndJoinAsync();
 		}
 
-		private async void ConnectToServer()
+		private async Task ConnectAndJoinAsync()
 		{
 			try
 			{
 				_client = new TcpClient();
-				await _client.ConnectAsync(_serverAddress, _port);
+				await _client.ConnectAsync(_serverAddress, _serverPort);
 				_stream = _client.GetStream();
-				TxtStatus.Text = $"Połączono z serwerem {_serverAddress}:{_port}";
+				TxtStatus.Text = "Połączono z serwerem, wysyłam JOIN...";
 
-				// Wyślij "hello" z nickiem
-				var hello = new NetMessage
+				// PIERWSZA WIADOMOŚĆ: join
+				var join = new NetMessage
 				{
-					Type = "hello",
-					Nickname = _nick
+					Type = "join",
+					PlayerName = _nick
 				};
-				var jsonHello = JsonSerializer.Serialize(hello);
-				var bytesHello = Encoding.UTF8.GetBytes(jsonHello);
-				await _stream.WriteAsync(bytesHello);
+
+				var json = JsonSerializer.Serialize(join);
+				var bytes = Encoding.UTF8.GetBytes(json);
+				await _stream.WriteAsync(bytes);
+
+				TxtStatus.Text = "JOIN wysłany, oczekiwanie na przeciwnika...";
 
 				_ = ReceiveLoop();
 			}
@@ -69,7 +72,7 @@ namespace Gwent.Client.Wpf
 				try
 				{
 					bytes = await _stream.ReadAsync(buffer);
-					if (bytes == 0) break; // serwer rozłączył
+					if (bytes == 0) break;
 				}
 				catch
 				{
@@ -84,7 +87,7 @@ namespace Gwent.Client.Wpf
 				}
 				catch
 				{
-					continue;
+					msg = null;
 				}
 
 				if (msg == null) continue;
@@ -105,49 +108,24 @@ namespace Gwent.Client.Wpf
 		{
 			if (_gameState == null) return;
 
-			// Ustalamy, który gracz to "ja" po nicku
-			PlayerState me;
-			PlayerState opp;
+			// Który PlayerState jest "mój"? – po nicku
+			bool iAmP1 = string.Equals(_gameState.Player1.Name, _nick, StringComparison.Ordinal);
+			var me = iAmP1 ? _gameState.Player1 : _gameState.Player2;
 
-			if (string.Equals(_gameState.Player1.Name, _nick, StringComparison.OrdinalIgnoreCase))
-			{
-				me = _gameState.Player1;
-				opp = _gameState.Player2;
-			}
-			else if (string.Equals(_gameState.Player2.Name, _nick, StringComparison.OrdinalIgnoreCase))
-			{
-				me = _gameState.Player2;
-				opp = _gameState.Player1;
-			}
-			else
-			{
-				// fallback – jakby nick nie był jeszcze zsynchronizowany
-				me = _gameState.Player1;
-				opp = _gameState.Player2;
-			}
-
-			TxtMeName.Text = me.Name;
-			TxtOppName.Text = opp.Name;
-
-			// Ręka
 			HandList.ItemsSource = null;
 			HandList.ItemsSource = me.Hand;
 
-			// Status
 			TxtStatus.Text =
-				$"Runda: {_gameState.RoundNumber} | Tura: {_gameState.CurrentPlayerId} | " +
-				$"HP: {_gameState.Player1.Name}={_gameState.Player1.Lives}  {_gameState.Player2.Name}={_gameState.Player2.Lives}";
+				$"Ty: {me.Name} | Runda: {_gameState.RoundNumber} | Tura: {_gameState.CurrentPlayerId} | " +
+				$"HP: P1={_gameState.Player1.Lives} P2={_gameState.Player2.Lives}";
 
-			// Stół – wybieramy odpowiednią listę kart
 			var meleeRow = _gameState.Board.Rows.First(r => r.Row == Row.Melee);
 			var rangedRow = _gameState.Board.Rows.First(r => r.Row == Row.Ranged);
 			var siegeRow = _gameState.Board.Rows.First(r => r.Row == Row.Siege);
 
-			bool meIsP1 = ReferenceEquals(me, _gameState.Player1);
-
-			var myMelee = meIsP1 ? meleeRow.Player1Cards : meleeRow.Player2Cards;
-			var myRanged = meIsP1 ? rangedRow.Player1Cards : rangedRow.Player2Cards;
-			var mySiege = meIsP1 ? siegeRow.Player1Cards : siegeRow.Player2Cards;
+			var myMelee = iAmP1 ? meleeRow.Player1Cards : meleeRow.Player2Cards;
+			var myRanged = iAmP1 ? rangedRow.Player1Cards : rangedRow.Player2Cards;
+			var mySiege = iAmP1 ? siegeRow.Player1Cards : siegeRow.Player2Cards;
 
 			BoardMelee.ItemsSource = myMelee.Select(c => c.ToString());
 			BoardRanged.ItemsSource = myRanged.Select(c => c.ToString());

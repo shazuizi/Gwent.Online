@@ -11,224 +11,179 @@ namespace Gwent.Server
 {
 	internal class Program
 	{
-		// Wspólny stan gry
-		private static readonly GameState _gameState = new GameState
-		{
-			Player1 = new PlayerState { PlayerId = "P1", Name = string.Empty },
-			Player2 = new PlayerState { PlayerId = "P2", Name = string.Empty }
-		};
-
-		private static readonly List<TcpClient> _clients = new();
-		private static readonly Dictionary<TcpClient, string> _clientToPlayerId = new();
-		private static readonly object _lock = new();
-
 		static async Task Main(string[] args)
 		{
-			// PORT z argumentu, domyślnie 9000
 			int port = 9000;
 			if (args.Length > 0 && int.TryParse(args[0], out var p))
 				port = p;
 
 			var listener = new TcpListener(IPAddress.Any, port);
 			listener.Start();
-			Console.WriteLine($"[SERVER] Gwint startuje na porcie {port}...");
+			Console.WriteLine($"Serwer Gwinta: nasłuchuję na porcie {port}...");
 
-			while (true)
+			var gameState = new GameState();
+
+			// lista (PlayerId, TcpClient)
+			var clients = new List<(string PlayerId, TcpClient Client)>();
+
+			// --- ETAP 1: przyjmujemy 2 graczy i oczekujemy "join" ---
+			while (clients.Count < 2)
 			{
 				var client = await listener.AcceptTcpClientAsync();
-				lock (_lock)
-				{
-					_clients.Add(client);
-				}
+				Console.WriteLine("Nowe połączenie, czekam na JOIN...");
 
-				Console.WriteLine("[SERVER] Nowe połączenie przyjęte.");
-				_ = HandleClient(client);
-			}
-		}
+				var stream = client.GetStream();
+				var buffer = new byte[4096];
+				int bytes;
 
-		private static async Task HandleClient(TcpClient client)
-		{
-			using var stream = client.GetStream();
-			var buffer = new byte[4096];
-
-			string? playerId = null;
-
-			// 1) ODBIÓR PIERWSZEJ WIADOMOŚCI "join" Z NICKIEM
-			int bytes;
-			try
-			{
-				bytes = await stream.ReadAsync(buffer);
-				if (bytes == 0) return;
-			}
-			catch
-			{
-				return;
-			}
-
-			var json = Encoding.UTF8.GetString(buffer, 0, bytes);
-			var joinMsg = JsonSerializer.Deserialize<NetMessage>(json);
-
-			if (joinMsg == null || joinMsg.Type != "join")
-			{
-				await SendError(stream, "Nieprawidłowa pierwsza wiadomość (oczekiwano 'join').");
-				client.Close();
-				return;
-			}
-
-			string nick = string.IsNullOrWhiteSpace(joinMsg.Nick) ? "Gracz" : joinMsg.Nick;
-
-			// 2) PRZYDZIELENIE SLOTU P1/P2
-			lock (_lock)
-			{
-				if (string.IsNullOrEmpty(_gameState.Player1.Name))
-				{
-					playerId = "P1";
-					_gameState.Player1.Name = nick;
-				}
-				else if (string.IsNullOrEmpty(_gameState.Player2.Name))
-				{
-					playerId = "P2";
-					_gameState.Player2.Name = nick;
-				}
-				else
-				{
-					// Serwer pełny
-					playerId = null;
-				}
-
-				if (playerId != null)
-				{
-					_clientToPlayerId[client] = playerId;
-					Console.WriteLine($"[SERVER] {nick} dołącza jako {playerId}");
-				}
-			}
-
-			if (playerId == null)
-			{
-				await SendError(stream, "Serwer jest pełny (2 graczy).");
-				client.Close();
-				return;
-			}
-
-			// 3) Wyślij informację "joined" z PlayerId i aktualnym stanem
-			await SendMessage(stream, new NetMessage
-			{
-				Type = "joined",
-				PlayerId = playerId,
-				GameState = _gameState
-			});
-
-			// 4) Jeśli mamy już 2 nicki, a gra jeszcze nie wystartowała -> start
-			lock (_lock)
-			{
-				if (_gameState.Phase == GamePhase.WaitingForPlayers &&
-					!string.IsNullOrEmpty(_gameState.Player1.Name) &&
-					!string.IsNullOrEmpty(_gameState.Player2.Name))
-				{
-					Console.WriteLine("[SERVER] Obaj gracze połączeni – start gry.");
-					GameLogic.StartGame(_gameState);
-					_ = SendStateToAll(); // broadcast nowego stanu
-				}
-			}
-
-			// 5) Główna pętla odbioru wiadomości od tego klienta
-			while (true)
-			{
 				try
 				{
 					bytes = await stream.ReadAsync(buffer);
-					if (bytes == 0) break; // rozłączony
+					if (bytes == 0)
+					{
+						client.Close();
+						continue;
+					}
+				}
+				catch
+				{
+					client.Close();
+					continue;
+				}
+
+				var json = Encoding.UTF8.GetString(buffer, 0, bytes);
+				NetMessage? msg;
+				try
+				{
+					msg = JsonSerializer.Deserialize<NetMessage>(json);
+				}
+				catch
+				{
+					msg = null;
+				}
+
+				if (msg == null || msg.Type != "join" || string.IsNullOrWhiteSpace(msg.PlayerName))
+				{
+					Console.WriteLine("Nieprawidłowa pierwsza wiadomość (oczekiwano 'join').");
+					await SendError(stream, "Nieprawidłowa pierwsza wiadomość (oczekiwano 'join').");
+					client.Close();
+					continue;
+				}
+
+				// przypisujemy gracza jako P1 albo P2
+				string playerId = clients.Count == 0 ? "P1" : "P2";
+
+				if (playerId == "P1")
+				{
+					gameState.Player1.PlayerId = playerId;
+					gameState.Player1.Name = msg.PlayerName;
+				}
+				else
+				{
+					gameState.Player2.PlayerId = playerId;
+					gameState.Player2.Name = msg.PlayerName;
+				}
+
+				clients.Add((playerId, client));
+				Console.WriteLine($"Gracz '{msg.PlayerName}' dołączył jako {playerId}.");
+			}
+
+			// --- ETAP 2: start gry ---
+			GameLogic.StartGame(gameState);
+			Console.WriteLine("Gra rozpoczęta.");
+
+			// lista samych TcpClientów do broadcastu stanu
+			var clientSockets = new List<TcpClient>(clients.Count);
+			foreach (var c in clients)
+				clientSockets.Add(c.Client);
+
+			// start pętli dla każdego gracza
+			foreach (var (playerId, client) in clients)
+			{
+				_ = HandleClient(playerId, client, gameState, clientSockets);
+			}
+
+			// trzymamy proces przy życiu
+			await Task.Delay(Timeout.Infinite);
+		}
+
+		private static async Task HandleClient(
+			string playerId,
+			TcpClient client,
+			GameState gameState,
+			List<TcpClient> allClients)
+		{
+			using var stream = client.GetStream();
+			await SendStateToAll(allClients, gameState);
+
+			var buffer = new byte[4096];
+
+			while (true)
+			{
+				int bytes;
+				try
+				{
+					bytes = await stream.ReadAsync(buffer);
+					if (bytes == 0) break; // klient się rozłączył
 				}
 				catch
 				{
 					break;
 				}
 
-				json = Encoding.UTF8.GetString(buffer, 0, bytes);
-				var msg = JsonSerializer.Deserialize<NetMessage>(json);
-				if (msg == null) continue;
+				var json = Encoding.UTF8.GetString(buffer, 0, bytes);
+				NetMessage? msg;
+				try
+				{
+					msg = JsonSerializer.Deserialize<NetMessage>(json);
+				}
+				catch
+				{
+					msg = null;
+				}
 
-				// We wszystkich wiadomościach po join spodziewamy się PlayerId od klienta
-				var pid = msg.PlayerId ?? playerId;
-				if (pid == null) continue;
+				if (msg == null) continue;
 
 				if (msg.Type == "playCard" && msg.CardId != null)
 				{
-					bool ok;
-					lock (_lock)
-					{
-						ok = GameLogic.PlayCard(_gameState, pid, msg.CardId, msg.TargetRow);
-					}
-
+					bool ok = GameLogic.PlayCard(gameState, playerId, msg.CardId, msg.TargetRow);
 					if (!ok)
 					{
 						await SendError(stream, "Nie można zagrać tej karty.");
 					}
-					else
-					{
-						await SendStateToAll();
-					}
 				}
 				else if (msg.Type == "pass")
 				{
-					lock (_lock)
-					{
-						GameLogic.Pass(_gameState, pid);
-					}
-					await SendStateToAll();
+					GameLogic.Pass(gameState, playerId);
 				}
-			}
 
-			// 6) Rozłączenie
-			lock (_lock)
-			{
-				Console.WriteLine("[SERVER] Gracz rozłączony.");
-				_clients.Remove(client);
-				_clientToPlayerId.Remove(client);
+				await SendStateToAll(allClients, gameState);
 			}
 		}
 
 		private static async ValueTask SendError(NetworkStream stream, string error)
 		{
 			var msg = new NetMessage { Type = "error", Error = error };
-			await SendMessage(stream, msg);
-		}
-
-		private static async ValueTask SendMessage(NetworkStream stream, NetMessage msg)
-		{
 			var json = JsonSerializer.Serialize(msg);
 			var bytes = Encoding.UTF8.GetBytes(json);
 			await stream.WriteAsync(bytes);
 		}
 
-		private static async ValueTask SendStateToAll()
+		private static async ValueTask SendStateToAll(List<TcpClient> clients, GameState gameState)
 		{
 			var msg = new NetMessage
 			{
 				Type = "state",
-				GameState = _gameState
+				GameState = gameState
 			};
 
 			var json = JsonSerializer.Serialize(msg);
 			var bytes = Encoding.UTF8.GetBytes(json);
 
-			List<TcpClient> clientsCopy;
-			lock (_lock)
+			foreach (var client in clients)
 			{
-				clientsCopy = new List<TcpClient>(_clients);
-			}
-
-			foreach (var client in clientsCopy)
-			{
-				try
-				{
-					var stream = client.GetStream();
-					await stream.WriteAsync(bytes);
-				}
-				catch
-				{
-					// ignoruj błędy pojedynczych klientów
-				}
+				var stream = client.GetStream();
+				await stream.WriteAsync(bytes);
 			}
 		}
 	}
