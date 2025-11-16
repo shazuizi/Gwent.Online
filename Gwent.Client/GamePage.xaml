@@ -2,14 +2,15 @@
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       Title="GamePage">
-    <Grid>
+    <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Pasek z nickami graczy -->
-        <Border Grid.Row="0" Padding="10" BorderThickness="0,0,0,1" BorderBrush="Gray">
+        <!-- Pasek z nickami i siłą -->
+        <Border Grid.Row="0" Padding="5" BorderThickness="0,0,0,1" BorderBrush="Gray">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -17,36 +18,90 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Column="0" Orientation="Vertical">
-                    <TextBlock Text="You:"
-                               FontWeight="Bold"/>
-                    <TextBlock x:Name="LocalPlayerNicknameTextBlock"
-                               FontSize="16"/>
-                    <TextBlock x:Name="LocalPlayerRoleTextBlock"
-                               FontSize="12"
-                               Foreground="Gray"/>
+                    <TextBlock Text="You" FontWeight="Bold"/>
+                    <TextBlock x:Name="LocalPlayerNicknameTextBlock"/>
+                    <TextBlock x:Name="LocalPlayerRoleTextBlock" FontSize="11" Foreground="Gray"/>
+                    <TextBlock x:Name="LocalPlayerStrengthTextBlock" FontSize="14" FontWeight="Bold"/>
                 </StackPanel>
 
                 <StackPanel Grid.Column="1" Orientation="Vertical" HorizontalAlignment="Right">
-                    <TextBlock Text="Opponent:"
-                               FontWeight="Bold"
-                               HorizontalAlignment="Right"/>
-                    <TextBlock x:Name="OpponentNicknameTextBlock"
-                               FontSize="16"
-                               HorizontalAlignment="Right"/>
-                    <TextBlock x:Name="OpponentRoleTextBlock"
-                               FontSize="12"
-                               Foreground="Gray"
-                               HorizontalAlignment="Right"/>
+                    <TextBlock Text="Opponent" FontWeight="Bold" HorizontalAlignment="Right"/>
+                    <TextBlock x:Name="OpponentNicknameTextBlock" HorizontalAlignment="Right"/>
+                    <TextBlock x:Name="OpponentRoleTextBlock" FontSize="11" Foreground="Gray" HorizontalAlignment="Right"/>
+                    <TextBlock x:Name="OpponentStrengthTextBlock" FontSize="14" FontWeight="Bold" HorizontalAlignment="Right"/>
                 </StackPanel>
             </Grid>
         </Border>
 
-        <!-- Placeholder planszy gry -->
-        <Grid Grid.Row="1">
-            <TextBlock Text="Game Board Placeholder"
-                       HorizontalAlignment="Center"
-                       VerticalAlignment="Center"
-                       FontSize="24"/>
+        <!-- Plansza: rzędy graczy -->
+        <Grid Grid.Row="1" Margin="0,10,0,10">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <TextBlock Grid.Row="0" Text="Opponent rows" FontWeight="Bold" Margin="0,0,0,5"/>
+
+            <Grid Grid.Row="1">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <GroupBox Header="Melee" Grid.Row="0" Margin="0,0,0,5">
+                    <ListBox x:Name="OpponentMeleeRowListBox" />
+                </GroupBox>
+                <GroupBox Header="Ranged" Grid.Row="1" Margin="0,0,0,5">
+                    <ListBox x:Name="OpponentRangedRowListBox" />
+                </GroupBox>
+                <GroupBox Header="Siege" Grid.Row="2">
+                    <ListBox x:Name="OpponentSiegeRowListBox" />
+                </GroupBox>
+            </Grid>
+
+            <TextBlock Grid.Row="2" Text="Your rows" FontWeight="Bold" Margin="0,10,0,5"/>
+
+            <Grid Grid.Row="3">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <GroupBox Header="Melee" Grid.Row="0" Margin="0,0,0,5">
+                    <ListBox x:Name="LocalMeleeRowListBox" />
+                </GroupBox>
+                <GroupBox Header="Ranged" Grid.Row="1" Margin="0,0,0,5">
+                    <ListBox x:Name="LocalRangedRowListBox" />
+                </GroupBox>
+                <GroupBox Header="Siege" Grid.Row="2">
+                    <ListBox x:Name="LocalSiegeRowListBox" />
+                </GroupBox>
+            </Grid>
         </Grid>
+
+        <!-- Ręka + przyciski -->
+        <DockPanel Grid.Row="2">
+            <GroupBox Header="Your hand" DockPanel.Dock="Top" Margin="0,0,10,0">
+                <ListBox x:Name="HandListBox"
+                         DisplayMemberPath="Name"
+                         Height="100"/>
+            </GroupBox>
+
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                <Button x:Name="PlayCardButton"
+                        Content="Play selected card"
+                        Width="150"
+                        Margin="0,0,10,0"
+                        Click="PlayCardButton_Click"/>
+                <Button x:Name="PassButton"
+                        Content="Pass"
+                        Width="80"
+                        Click="PassButton_Click"/>
+            </StackPanel>
+        </DockPanel>
     </Grid>
 </Page>
