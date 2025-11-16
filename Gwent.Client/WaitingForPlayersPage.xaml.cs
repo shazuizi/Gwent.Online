@@ -1,8 +1,6 @@
-﻿using System;
-using System.Threading.Tasks;
+﻿using Gwent.Core;
 using System.Windows;
 using System.Windows.Controls;
-using Gwent.Core;
 
 namespace Gwent.Client
 {

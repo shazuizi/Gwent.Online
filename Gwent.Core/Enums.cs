@@ -33,6 +33,7 @@
 
 		// jednostki:
 		Spy,
+
 		Medic,
 		TightBond,
 		Muster,
@@ -44,12 +45,14 @@
 
 		// Pogoda:
 		WeatherBitingFrost,
+
 		WeatherImpenetrableFog,
 		WeatherTorrentialRain,
 		ClearWeather,
 
 		// Specjalne:
 		Decoy,
+
 		Mardroeme,
 
 		// Zdolności dowódców:

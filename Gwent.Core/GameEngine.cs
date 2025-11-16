@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-
-namespace Gwent.Core
+﻿namespace Gwent.Core
 {
 	public class GameEngine
 	{
@@ -336,7 +332,7 @@ namespace Gwent.Core
 			return BoardState.HostPlayerBoard;
 		}
 
-		#endregion
+		#endregion Init / helpers
 
 		#region LogEntry
 
@@ -356,7 +352,7 @@ namespace Gwent.Core
 			}
 		}
 
-		#endregion
+		#endregion LogEntry
 
 		#region Mulligan
 
@@ -394,8 +390,7 @@ namespace Gwent.Core
 			AddLogEntry($"{player.PlayerNickname} mulliganed {card.Name}.");
 		}
 
-
-		#endregion
+		#endregion Mulligan
 
 		#region Play card + targeted abilities
 
@@ -616,7 +611,7 @@ namespace Gwent.Core
 			player.Graveyard.Add(mardroemeCard);
 		}
 
-		#endregion
+		#endregion Play card + targeted abilities
 
 		#region Pass / Resign / Leader
 
@@ -823,9 +818,6 @@ namespace Gwent.Core
 			RecalculateStrengths();
 		}
 
-
-
-
 		private void ClearRows(PlayerBoardState player)
 		{
 			MoveRowToGraveyard(player, player.MeleeRow);
@@ -860,8 +852,7 @@ namespace Gwent.Core
 			}
 		}
 
-
-		#endregion
+		#endregion Pass / Resign / Leader
 
 		#region Scorch / Recalc
 
@@ -1013,6 +1004,6 @@ namespace Gwent.Core
 			ApplyTightBond(BoardState.GuestPlayerBoard.SiegeRow);
 		}
 
-		#endregion
+		#endregion Scorch / Recalc
 	}
 }

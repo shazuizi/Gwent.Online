@@ -1,7 +1,4 @@
-﻿using System.Collections.Generic;
-using System.Linq;
-
-namespace Gwent.Core
+﻿namespace Gwent.Core
 {
 	public class PlayerBoardState
 	{
@@ -28,8 +25,6 @@ namespace Gwent.Core
 		/// Czy zdolność dowódcy została już użyta.
 		/// </summary>
 		public bool LeaderAbilityUsed { get; set; }
-
-		
 
 		public int GetTotalStrength()
 		{

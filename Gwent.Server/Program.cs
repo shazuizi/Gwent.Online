@@ -1,11 +1,8 @@
-﻿using System;
-using System.Threading.Tasks;
-
-namespace Gwent.Server
+﻿namespace Gwent.Server
 {
 	internal class Program
 	{
-		static async Task Main(string[] args)
+		private static async Task Main(string[] args)
 		{
 			Console.Title = "Gwent Server";
 

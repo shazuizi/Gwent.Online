@@ -5,33 +5,33 @@
 
     <Grid Margin="10">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <!-- GÓRNY PASEK: gracze, runda, pogoda -->
         <Border Grid.Row="0" Padding="5" BorderThickness="0,0,0,1" BorderBrush="Gray">
             <Grid>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
                 <!-- Lokalny gracz -->
                 <StackPanel Grid.Column="0" Orientation="Vertical">
-                    <TextBlock Text="You" FontWeight="Bold"/>
-                    <TextBlock x:Name="LocalPlayerNicknameTextBlock"/>
-                    <TextBlock x:Name="LocalFactionTextBlock" FontSize="11" Foreground="DarkSlateGray"/>
-                    <TextBlock x:Name="LocalPlayerRoleTextBlock" FontSize="11" Foreground="Gray"/>
-                    <TextBlock x:Name="LocalPlayerStrengthTextBlock" FontSize="14" FontWeight="Bold"/>
-                    <TextBlock x:Name="LocalLivesTextBlock" FontSize="12"/>
-                    <TextBlock x:Name="LocalLeaderTextBlock" FontSize="12"/>
-                    <TextBlock x:Name="LocalDeckTextBlock" FontSize="11"/>
-                    <TextBlock x:Name="LocalGraveyardTextBlock" FontSize="11"/>
-                    <TextBlock x:Name="LocalMulliganTextBlock" FontSize="11"/>
-                    <TextBlock x:Name="LocalPassStatusTextBlock" FontSize="11" Foreground="DarkOrange"/>
+                    <TextBlock Text="You" FontWeight="Bold" />
+                    <TextBlock x:Name="LocalPlayerNicknameTextBlock" />
+                    <TextBlock x:Name="LocalFactionTextBlock" FontSize="11" Foreground="DarkSlateGray" />
+                    <TextBlock x:Name="LocalPlayerRoleTextBlock" FontSize="11" Foreground="Gray" />
+                    <TextBlock x:Name="LocalPlayerStrengthTextBlock" FontSize="14" FontWeight="Bold" />
+                    <TextBlock x:Name="LocalLivesTextBlock" FontSize="12" />
+                    <TextBlock x:Name="LocalLeaderTextBlock" FontSize="12" />
+                    <TextBlock x:Name="LocalDeckTextBlock" FontSize="11" />
+                    <TextBlock x:Name="LocalGraveyardTextBlock" FontSize="11" />
+                    <TextBlock x:Name="LocalMulliganTextBlock" FontSize="11" />
+                    <TextBlock x:Name="LocalPassStatusTextBlock" FontSize="11" Foreground="DarkOrange" />
                 </StackPanel>
 
                 <!-- Środek -->
@@ -39,29 +39,29 @@
                     <TextBlock x:Name="RoundNumberTextBlock"
                                FontWeight="Bold"
                                FontSize="14"
-                               HorizontalAlignment="Center"/>
+                               HorizontalAlignment="Center" />
                     <TextBlock x:Name="TurnIndicatorTextBlock"
                                FontSize="12"
                                HorizontalAlignment="Center"
-                               Margin="0,2,0,0"/>
+                               Margin="0,2,0,0" />
                     <TextBlock x:Name="WeatherTextBlock"
                                FontSize="12"
                                HorizontalAlignment="Center"
-                               Margin="0,4,0,0"/>
+                               Margin="0,4,0,0" />
                 </StackPanel>
 
                 <!-- Przeciwnik -->
                 <StackPanel Grid.Column="2" Orientation="Vertical" HorizontalAlignment="Right">
-                    <TextBlock Text="Opponent" FontWeight="Bold" HorizontalAlignment="Right"/>
-                    <TextBlock x:Name="OpponentNicknameTextBlock" HorizontalAlignment="Right"/>
-                    <TextBlock x:Name="OpponentFactionTextBlock" FontSize="11" Foreground="DarkSlateGray" HorizontalAlignment="Right"/>
-                    <TextBlock x:Name="OpponentRoleTextBlock" FontSize="11" Foreground="Gray" HorizontalAlignment="Right"/>
-                    <TextBlock x:Name="OpponentPlayerStrengthTextBlock" FontSize="14" FontWeight="Bold" HorizontalAlignment="Right"/>
-                    <TextBlock x:Name="OpponentLivesTextBlock" FontSize="12" HorizontalAlignment="Right"/>
-                    <TextBlock x:Name="OpponentLeaderTextBlock" FontSize="12" HorizontalAlignment="Right"/>
-                    <TextBlock x:Name="OpponentDeckTextBlock" FontSize="11" HorizontalAlignment="Right"/>
-                    <TextBlock x:Name="OpponentGraveyardTextBlock" FontSize="11" HorizontalAlignment="Right"/>
-                    <TextBlock x:Name="OpponentPassStatusTextBlock" FontSize="11" Foreground="DarkOrange" HorizontalAlignment="Right"/>
+                    <TextBlock Text="Opponent" FontWeight="Bold" HorizontalAlignment="Right" />
+                    <TextBlock x:Name="OpponentNicknameTextBlock" HorizontalAlignment="Right" />
+                    <TextBlock x:Name="OpponentFactionTextBlock" FontSize="11" Foreground="DarkSlateGray" HorizontalAlignment="Right" />
+                    <TextBlock x:Name="OpponentRoleTextBlock" FontSize="11" Foreground="Gray" HorizontalAlignment="Right" />
+                    <TextBlock x:Name="OpponentPlayerStrengthTextBlock" FontSize="14" FontWeight="Bold" HorizontalAlignment="Right" />
+                    <TextBlock x:Name="OpponentLivesTextBlock" FontSize="12" HorizontalAlignment="Right" />
+                    <TextBlock x:Name="OpponentLeaderTextBlock" FontSize="12" HorizontalAlignment="Right" />
+                    <TextBlock x:Name="OpponentDeckTextBlock" FontSize="11" HorizontalAlignment="Right" />
+                    <TextBlock x:Name="OpponentGraveyardTextBlock" FontSize="11" HorizontalAlignment="Right" />
+                    <TextBlock x:Name="OpponentPassStatusTextBlock" FontSize="11" Foreground="DarkOrange" HorizontalAlignment="Right" />
                 </StackPanel>
             </Grid>
         </Border>
@@ -69,28 +69,28 @@
         <!-- ŚRODKOWA CZĘŚĆ: plansza + powiększona karta -->
         <Grid Grid.Row="1" Margin="0,10,0,10">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="3*"/>
-                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="3*" />
+                <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
             <!-- PLANSZA -->
             <Grid Grid.Column="0">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
-                <TextBlock Grid.Row="0" Text="Opponent rows" FontWeight="Bold" Margin="0,0,0,5"/>
+                <TextBlock Grid.Row="0" Text="Opponent rows" FontWeight="Bold" Margin="0,0,0,5" />
 
                 <!-- Rzędy przeciwnika -->
                 <Grid Grid.Row="1">
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
                     <GroupBox Grid.Row="0" Margin="0,0,0,5"
@@ -98,9 +98,9 @@
                               MouseLeftButtonUp="OpponentRowGroupBox_MouseLeftButtonUp">
                         <GroupBox.Header>
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="Melee"/>
+                                <TextBlock Text="Melee" />
                                 <TextBlock Text=" (" />
-                                <TextBlock x:Name="OpponentMeleeStrengthTextBlock"/>
+                                <TextBlock x:Name="OpponentMeleeStrengthTextBlock" />
                                 <TextBlock Text=")" />
                             </StackPanel>
                         </GroupBox.Header>
@@ -109,9 +109,9 @@
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
                                     <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="{Binding Name}"/>
+                                        <TextBlock Text="{Binding Name}" />
                                         <TextBlock Text=" (" />
-                                        <TextBlock Text="{Binding CurrentStrength}"/>
+                                        <TextBlock Text="{Binding CurrentStrength}" />
                                         <TextBlock Text=")" />
                                     </StackPanel>
                                 </DataTemplate>
@@ -124,9 +124,9 @@
                               MouseLeftButtonUp="OpponentRowGroupBox_MouseLeftButtonUp">
                         <GroupBox.Header>
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="Ranged"/>
+                                <TextBlock Text="Ranged" />
                                 <TextBlock Text=" (" />
-                                <TextBlock x:Name="OpponentRangedStrengthTextBlock"/>
+                                <TextBlock x:Name="OpponentRangedStrengthTextBlock" />
                                 <TextBlock Text=")" />
                             </StackPanel>
                         </GroupBox.Header>
@@ -135,9 +135,9 @@
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
                                     <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="{Binding Name}"/>
+                                        <TextBlock Text="{Binding Name}" />
                                         <TextBlock Text=" (" />
-                                        <TextBlock Text="{Binding CurrentStrength}"/>
+                                        <TextBlock Text="{Binding CurrentStrength}" />
                                         <TextBlock Text=")" />
                                     </StackPanel>
                                 </DataTemplate>
@@ -150,9 +150,9 @@
                               MouseLeftButtonUp="OpponentRowGroupBox_MouseLeftButtonUp">
                         <GroupBox.Header>
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="Siege"/>
+                                <TextBlock Text="Siege" />
                                 <TextBlock Text=" (" />
-                                <TextBlock x:Name="OpponentSiegeStrengthTextBlock"/>
+                                <TextBlock x:Name="OpponentSiegeStrengthTextBlock" />
                                 <TextBlock Text=")" />
                             </StackPanel>
                         </GroupBox.Header>
@@ -161,9 +161,9 @@
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
                                     <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="{Binding Name}"/>
+                                        <TextBlock Text="{Binding Name}" />
                                         <TextBlock Text=" (" />
-                                        <TextBlock Text="{Binding CurrentStrength}"/>
+                                        <TextBlock Text="{Binding CurrentStrength}" />
                                         <TextBlock Text=")" />
                                     </StackPanel>
                                 </DataTemplate>
@@ -172,14 +172,14 @@
                     </GroupBox>
                 </Grid>
 
-                <TextBlock Grid.Row="2" Text="Your rows" FontWeight="Bold" Margin="0,10,0,5"/>
+                <TextBlock Grid.Row="2" Text="Your rows" FontWeight="Bold" Margin="0,10,0,5" />
 
                 <!-- Rzędy lokalnego gracza -->
                 <Grid Grid.Row="3">
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
                     <GroupBox Grid.Row="0" Margin="0,0,0,5"
@@ -187,9 +187,9 @@
                               MouseLeftButtonUp="LocalRowGroupBox_MouseLeftButtonUp">
                         <GroupBox.Header>
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="Melee"/>
+                                <TextBlock Text="Melee" />
                                 <TextBlock Text=" (" />
-                                <TextBlock x:Name="LocalMeleeStrengthTextBlock"/>
+                                <TextBlock x:Name="LocalMeleeStrengthTextBlock" />
                                 <TextBlock Text=")" />
                             </StackPanel>
                         </GroupBox.Header>
@@ -198,9 +198,9 @@
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
                                     <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="{Binding Name}"/>
+                                        <TextBlock Text="{Binding Name}" />
                                         <TextBlock Text=" (" />
-                                        <TextBlock Text="{Binding CurrentStrength}"/>
+                                        <TextBlock Text="{Binding CurrentStrength}" />
                                         <TextBlock Text=")" />
                                     </StackPanel>
                                 </DataTemplate>
@@ -213,9 +213,9 @@
                               MouseLeftButtonUp="LocalRowGroupBox_MouseLeftButtonUp">
                         <GroupBox.Header>
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="Ranged"/>
+                                <TextBlock Text="Ranged" />
                                 <TextBlock Text=" (" />
-                                <TextBlock x:Name="LocalRangedStrengthTextBlock"/>
+                                <TextBlock x:Name="LocalRangedStrengthTextBlock" />
                                 <TextBlock Text=")" />
                             </StackPanel>
                         </GroupBox.Header>
@@ -224,9 +224,9 @@
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
                                     <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="{Binding Name}"/>
+                                        <TextBlock Text="{Binding Name}" />
                                         <TextBlock Text=" (" />
-                                        <TextBlock Text="{Binding CurrentStrength}"/>
+                                        <TextBlock Text="{Binding CurrentStrength}" />
                                         <TextBlock Text=")" />
                                     </StackPanel>
                                 </DataTemplate>
@@ -239,9 +239,9 @@
                               MouseLeftButtonUp="LocalRowGroupBox_MouseLeftButtonUp">
                         <GroupBox.Header>
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="Siege"/>
+                                <TextBlock Text="Siege" />
                                 <TextBlock Text=" (" />
-                                <TextBlock x:Name="LocalSiegeStrengthTextBlock"/>
+                                <TextBlock x:Name="LocalSiegeStrengthTextBlock" />
                                 <TextBlock Text=")" />
                             </StackPanel>
                         </GroupBox.Header>
@@ -250,9 +250,9 @@
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
                                     <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="{Binding Name}"/>
+                                        <TextBlock Text="{Binding Name}" />
                                         <TextBlock Text=" (" />
-                                        <TextBlock Text="{Binding CurrentStrength}"/>
+                                        <TextBlock Text="{Binding CurrentStrength}" />
                                         <TextBlock Text=")" />
                                     </StackPanel>
                                 </DataTemplate>
@@ -266,7 +266,7 @@
                     <ListBox x:Name="LocalGraveyardListBox"
                              Height="80"
                              DisplayMemberPath="Name"
-                             SelectionChanged="LocalGraveyardListBox_SelectionChanged"/>
+                             SelectionChanged="LocalGraveyardListBox_SelectionChanged" />
                 </GroupBox>
             </Grid>
 
@@ -295,14 +295,14 @@
                        Margin="0,10,0,0"
                        FontSize="11"
                        Foreground="Gray"
-                       TextWrapping="Wrap"/>
+                       TextWrapping="Wrap" />
                     </StackPanel>
                 </GroupBox>
 
                 <!-- NOWE: game log -->
                 <GroupBox Header="Game log" Margin="10,10,0,0">
                     <ListBox x:Name="GameLogListBox"
-                 Height="200"/>
+                 Height="200" />
                 </GroupBox>
             </StackPanel>
         </Grid>
@@ -313,7 +313,7 @@
                 <ListBox x:Name="HandListBox"
                          DisplayMemberPath="Name"
                          Height="100"
-                         SelectionChanged="HandListBox_SelectionChanged"/>
+                         SelectionChanged="HandListBox_SelectionChanged" />
             </GroupBox>
 
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
@@ -321,26 +321,26 @@
                         Content="Play"
                         Width="80"
                         Margin="0,0,10,0"
-                        Click="PlayCardButton_Click"/>
+                        Click="PlayCardButton_Click" />
                 <Button x:Name="MulliganButton"
                         Content="Mulligan"
                         Width="90"
                         Margin="0,0,10,0"
-                        Click="MulliganButton_Click"/>
+                        Click="MulliganButton_Click" />
                 <Button x:Name="LeaderAbilityButton"
                         Content="Use Leader Ability"
                         Width="130"
                         Margin="0,0,10,0"
-                        Click="LeaderAbilityButton_Click"/>
+                        Click="LeaderAbilityButton_Click" />
                 <Button x:Name="PassButton"
                         Content="Pass"
                         Width="80"
                         Margin="0,0,10,0"
-                        Click="PassButton_Click"/>
+                        Click="PassButton_Click" />
                 <Button x:Name="SurrenderButton"
                         Content="Surrender"
                         Width="90"
-                        Click="SurrenderButton_Click"/>
+                        Click="SurrenderButton_Click" />
             </StackPanel>
         </DockPanel>
     </Grid>

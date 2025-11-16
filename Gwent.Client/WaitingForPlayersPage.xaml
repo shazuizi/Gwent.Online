@@ -7,7 +7,7 @@
             <TextBlock Text="Waiting for other player to connect..."
                        HorizontalAlignment="Center"
                        Margin="0,0,0,10"
-                       FontSize="18"/>
+                       FontSize="18" />
 
             <!-- Status połączenia -->
             <TextBlock x:Name="ConnectionStatusTextBlock"
@@ -15,13 +15,13 @@
                        HorizontalAlignment="Center"
                        Margin="0,0,0,10"
                        FontSize="14"
-                       Foreground="Gray"/>
+                       Foreground="Gray" />
 
             <Button x:Name="CancelButton"
                     Content="Cancel"
                     Width="100"
                     HorizontalAlignment="Center"
-                    Click="CancelButton_Click"/>
+                    Click="CancelButton_Click" />
         </StackPanel>
     </Grid>
 </Page>
