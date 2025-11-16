@@ -692,7 +692,7 @@ namespace Gwent.Core
 			}
 			else
 			{
-				// REMIS SIŁY – najpierw sprawdzamy bonus Nilfgaardu
+				// remis siły – najpierw bonus Nilfgaardu
 				if (host.Faction == FactionType.Nilfgaard && guest.Faction != FactionType.Nilfgaard)
 				{
 					roundWinner = host;
@@ -705,26 +705,37 @@ namespace Gwent.Core
 				}
 				else
 				{
-					
+					// prawdziwy remis – żadna strona nie ma bonusu
 					isTrueDraw = true;
 				}
 			}
 
 			if (isTrueDraw)
 			{
-				// OBAJ dostają punkt rundy i tracą jedno życie
-				host.RoundsWon++;
-				guest.RoundsWon++;
-
+				// OBIE strony tracą 1 życie
 				host.LifeTokensRemaining--;
 				guest.LifeTokensRemaining--;
 
+				// (opcjonalnie możesz zwiększać RoundsWon dla statystyk)
+				host.RoundsWon++;
+				guest.RoundsWon++;
 
-				// Remis całej gry – obaj zeszli do zera
+				// sprawdzamy wynik gry po takim remisie
 				if (host.LifeTokensRemaining <= 0 && guest.LifeTokensRemaining <= 0)
 				{
+					// remis całej gry
 					BoardState.IsGameFinished = true;
-					BoardState.WinnerNickname = null; // prawdziwy remis
+					BoardState.WinnerNickname = null;
+				}
+				else if (host.LifeTokensRemaining <= 0 && guest.LifeTokensRemaining > 0)
+				{
+					BoardState.IsGameFinished = true;
+					BoardState.WinnerNickname = guest.PlayerNickname;
+				}
+				else if (guest.LifeTokensRemaining <= 0 && host.LifeTokensRemaining > 0)
+				{
+					BoardState.IsGameFinished = true;
+					BoardState.WinnerNickname = host.PlayerNickname;
 				}
 			}
 			else if (roundWinner != null && roundLoser != null)
@@ -732,13 +743,12 @@ namespace Gwent.Core
 				roundWinner.RoundsWon++;
 				roundLoser.LifeTokensRemaining--;
 
-				// Northern Realms bonus – po wygranej rundzie dobierasz 1 kartę
+				// Northern Realms – bonus za WYGRANĄ rundę
 				if (roundWinner.Faction == FactionType.NorthernRealms)
 				{
 					DrawFromDeck(roundWinner, 1);
 				}
 
-				// przegrany spadł do 0 żyć → przegrana gry
 				if (roundLoser.LifeTokensRemaining <= 0)
 				{
 					BoardState.IsGameFinished = true;
@@ -746,7 +756,7 @@ namespace Gwent.Core
 				}
 			}
 
-			// dalej normalne zakończenie rundy
+			// standardowe czyszczenie rundy
 			ClearRows(host);
 			ClearRows(guest);
 
@@ -756,14 +766,15 @@ namespace Gwent.Core
 			BoardState.WeatherCards.Clear();
 			BoardState.CurrentRoundNumber++;
 
-			// nowa runda startuje od hosta (prosto)
 			if (!BoardState.IsGameFinished)
 			{
+				// prosto: nową rundę zaczyna host
 				BoardState.ActivePlayerNickname = host.PlayerNickname;
 			}
 
 			RecalculateStrengths();
 		}
+
 
 
 		private void ClearRows(PlayerBoardState player)

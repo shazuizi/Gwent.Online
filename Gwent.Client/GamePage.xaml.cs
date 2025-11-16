@@ -23,7 +23,7 @@ namespace Gwent.Client
 
 		private PendingTargetType pendingTargetType = PendingTargetType.None;
 		private GwentCard? pendingSourceCard;
-		private System.Windows.Point dragStartPoint;
+		private GwentCard? pendingHandCardForRowPlacement;
 
 		public GamePage(MainWindow mainWindow, GameClientController gameClientController)
 		{
@@ -406,38 +406,6 @@ namespace Gwent.Client
 			await gameClientController.SendGameActionAsync(actionPayload);
 		}
 
-		private void HandListBox_PreviewMouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
-		{
-			dragStartPoint = e.GetPosition(null);
-		}
-
-		private void HandListBox_PreviewMouseMove(object sender, System.Windows.Input.MouseEventArgs e)
-		{
-			if (e.LeftButton != System.Windows.Input.MouseButtonState.Pressed)
-				return;
-
-			System.Windows.Point mousePos = e.GetPosition(null);
-			Vector diff = mousePos - dragStartPoint;
-
-			if (Math.Abs(diff.X) < SystemParameters.MinimumHorizontalDragDistance &&
-				Math.Abs(diff.Y) < SystemParameters.MinimumVerticalDragDistance)
-			{
-				return;
-			}
-
-			var listBox = sender as ListBox;
-			if (listBox == null)
-				return;
-
-			var card = listBox.SelectedItem as GwentCard;
-			if (card == null)
-				return;
-
-			var data = new DataObject("GwentCard", card);
-			DragDrop.DoDragDrop(listBox, data, DragDropEffects.Move);
-		}
-
-
 		private async void MulliganButton_Click(object sender, RoutedEventArgs e)
 		{
 			if (gameClientController.CurrentBoardState == null)
@@ -607,44 +575,114 @@ namespace Gwent.Client
 
 		private async void LocalBoardRow_SelectionChanged(object sender, SelectionChangedEventArgs e)
 		{
-			if ((pendingTargetType != PendingTargetType.DecoyFromBoard &&
-				 pendingTargetType != PendingTargetType.MardroemeFromBoard) ||
-				pendingSourceCard == null)
-			{
-				return;
-			}
-
 			var listBox = sender as ListBox;
 			if (listBox == null)
 				return;
 
-			var targetCard = listBox.SelectedItem as GwentCard;
-			if (targetCard == null)
-				return;
+			var clickedCard = listBox.SelectedItem as GwentCard;
 
-			var boardState = gameClientController.CurrentBoardState;
-			if (boardState == null)
-				return;
-
-			var localBoard =
-				gameClientController.LocalPlayerRole == GameRole.Host
-					? boardState.HostPlayerBoard
-					: boardState.GuestPlayerBoard;
-
-			var actionPayload = new GameActionPayload
+			// 1) Tryb celowania dla Decoy / Mardroeme (tak jak wcześniej)
+			if ((pendingTargetType == PendingTargetType.DecoyFromBoard ||
+				 pendingTargetType == PendingTargetType.MardroemeFromBoard) &&
+				pendingSourceCard != null &&
+				clickedCard != null)
 			{
-				ActionType = GameActionType.PlayCard,
-				ActingPlayerNickname = localBoard.PlayerNickname,
-				CardInstanceId = pendingSourceCard.InstanceId,
-				TargetInstanceId = targetCard.InstanceId
-			};
+				var boardState = gameClientController.CurrentBoardState;
+				if (boardState == null)
+					return;
 
-			pendingSourceCard = null;
-			pendingTargetType = PendingTargetType.None;
+				var localBoard =
+					gameClientController.LocalPlayerRole == GameRole.Host
+						? boardState.HostPlayerBoard
+						: boardState.GuestPlayerBoard;
+
+				var actionPayload = new GameActionPayload
+				{
+					ActionType = GameActionType.PlayCard,
+					ActingPlayerNickname = localBoard.PlayerNickname,
+					CardInstanceId = pendingSourceCard.InstanceId,
+					TargetInstanceId = clickedCard.InstanceId
+				};
+
+				pendingSourceCard = null;
+				pendingTargetType = PendingTargetType.None;
+				listBox.SelectedItem = null;
+
+				await gameClientController.SendGameActionAsync(actionPayload);
+				return;
+			}
+
+			// 2) Zwykłe zagranie karty z ręki po kliknięciu rzędu
+			if (pendingHandCardForRowPlacement != null)
+			{
+				CardRow row = CardRow.Melee;
+				if (listBox.Tag is string tag)
+				{
+					row = tag switch
+					{
+						"Melee" => CardRow.Melee,
+						"Ranged" => CardRow.Ranged,
+						"Siege" => CardRow.Siege,
+						_ => CardRow.Melee
+					};
+				}
+
+				var cardToPlay = pendingHandCardForRowPlacement;
+				pendingHandCardForRowPlacement = null;
+				listBox.SelectedItem = null;
+
+				// Szpieg NIE może iść na własny rząd
+				if (cardToPlay.HasAbility(CardAbilityType.Spy))
+				{
+					MessageBox.Show("Spy cards must be placed on an opponent row.", "Info",
+						MessageBoxButton.OK, MessageBoxImage.Information);
+					return;
+				}
+
+				await TryPlayCardAsync(cardToPlay, row);
+			}
+		}
+
+		private async void OpponentBoardRow_SelectionChanged(object sender, SelectionChangedEventArgs e)
+		{
+			var listBox = sender as ListBox;
+			if (listBox == null)
+				return;
+
+			if (pendingHandCardForRowPlacement == null)
+				return;
+
+			var cardToPlay = pendingHandCardForRowPlacement;
+
+			CardRow row = CardRow.Melee;
+			if (listBox.Tag is string tag)
+			{
+				row = tag switch
+				{
+					"Melee" => CardRow.Melee,
+					"Ranged" => CardRow.Ranged,
+					"Siege" => CardRow.Siege,
+					_ => CardRow.Melee
+				};
+			}
+
+			pendingHandCardForRowPlacement = null;
 			listBox.SelectedItem = null;
 
-			await gameClientController.SendGameActionAsync(actionPayload);
+			// TYLKO szpieg może być zagrany na rząd przeciwnika
+			if (!cardToPlay.HasAbility(CardAbilityType.Spy))
+			{
+				MessageBox.Show("You can only place Spy cards on opponent rows.", "Info",
+					MessageBoxButton.OK, MessageBoxImage.Information);
+				return;
+			}
+
+			// Silnik i tak umieszcza Spy'a na planszy przeciwnika,
+			// tu tylko przekazujemy rząd (melee/ranged/siege).
+			await TryPlayCardAsync(cardToPlay, row);
 		}
+
+
 		private void RowListBox_DragOver(object sender, DragEventArgs e)
 		{
 			if (e.Data.GetDataPresent("GwentCard"))
@@ -690,6 +728,10 @@ namespace Gwent.Client
 			}
 
 			await TryPlayCardAsync(card, targetRow);
+		}
+		private void HandListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+		{
+			pendingHandCardForRowPlacement = HandListBox.SelectedItem as GwentCard;
 		}
 
 	}
