@@ -6,16 +6,23 @@ using Gwent.Core;
 
 namespace Gwent.Client
 {
-	/// <summary>
-	/// Główna strona rozgrywki – pokazuje stan planszy i pozwala grać karty / passować / poddać grę.
-	/// Wyświetla siłę każdego rzędu, lidera, talię, cmentarz i pogodę.
-	/// </summary>
 	public partial class GamePage : Page
 	{
 		private readonly MainWindow mainWindow;
 		private readonly GameClientController gameClientController;
 
 		private bool gameResultAlreadyShown;
+
+		private enum PendingTargetType
+		{
+			None,
+			MedicFromGraveyard,
+			DecoyFromBoard,
+			MardroemeFromBoard
+		}
+
+		private PendingTargetType pendingTargetType = PendingTargetType.None;
+		private GwentCard? pendingSourceCard;
 
 		public GamePage(MainWindow mainWindow, GameClientController gameClientController)
 		{
@@ -54,7 +61,7 @@ namespace Gwent.Client
 
 		private void UpdatePlayerNicknamesFromSessionConfiguration()
 		{
-			GameSessionConfiguration? sessionConfiguration = gameClientController.CurrentGameSessionConfiguration;
+			var sessionConfiguration = gameClientController.CurrentGameSessionConfiguration;
 			if (sessionConfiguration == null)
 			{
 				LocalPlayerNicknameTextBlock.Text = "Unknown";
@@ -85,14 +92,10 @@ namespace Gwent.Client
 			}
 
 			if (string.IsNullOrWhiteSpace(localNickname))
-			{
 				localNickname = "Unknown";
-			}
 
 			if (string.IsNullOrWhiteSpace(opponentNickname))
-			{
 				opponentNickname = "Waiting...";
-			}
 
 			LocalPlayerNicknameTextBlock.Text = localNickname;
 			OpponentNicknameTextBlock.Text = opponentNickname;
@@ -100,14 +103,10 @@ namespace Gwent.Client
 			OpponentRoleTextBlock.Text = opponentRoleText;
 		}
 
-		/// <summary>
-		/// Odświeża UI planszy na podstawie aktualnego stanu w GameClientController.
-		/// Pokazuje rundy, życia, pass, siłę globalną i dla każdego rzędu, lidera, talię, cmentarz i pogodę.
-		/// </summary>
 		private void UpdateBoardUi()
 		{
-			GameBoardState? boardState = gameClientController.CurrentBoardState;
-			GameSessionConfiguration? sessionConfiguration = gameClientController.CurrentGameSessionConfiguration;
+			var boardState = gameClientController.CurrentBoardState;
+			var sessionConfiguration = gameClientController.CurrentGameSessionConfiguration;
 
 			if (boardState == null || sessionConfiguration == null)
 			{
@@ -115,6 +114,7 @@ namespace Gwent.Client
 				LocalPlayerStrengthTextBlock.Text = "Strength: 0";
 				OpponentPlayerStrengthTextBlock.Text = "Strength: 0";
 				RoundNumberTextBlock.Text = "Round -";
+				WeatherTextBlock.Text = "Weather: -";
 				LocalLivesTextBlock.Text = "Lives: -";
 				OpponentLivesTextBlock.Text = "Lives: -";
 				LocalLeaderTextBlock.Text = "Leader: -";
@@ -123,11 +123,13 @@ namespace Gwent.Client
 				OpponentDeckTextBlock.Text = "Deck: -";
 				LocalGraveyardTextBlock.Text = "Graveyard: -";
 				OpponentGraveyardTextBlock.Text = "Graveyard: -";
-				WeatherTextBlock.Text = "Weather: -";
+				LocalMulliganTextBlock.Text = "Mulligans: -";
 				LocalPassStatusTextBlock.Text = string.Empty;
 				OpponentPassStatusTextBlock.Text = string.Empty;
 				PlayCardButton.IsEnabled = false;
 				PassButton.IsEnabled = false;
+				MulliganButton.IsEnabled = false;
+				LeaderAbilityButton.IsEnabled = false;
 				SurrenderButton.IsEnabled = false;
 				return;
 			}
@@ -148,11 +150,9 @@ namespace Gwent.Client
 
 			RoundNumberTextBlock.Text = $"Round {boardState.CurrentRoundNumber}";
 
-			// globalna siła
 			LocalPlayerStrengthTextBlock.Text = $"Strength: {localBoard.GetTotalStrength()}";
 			OpponentPlayerStrengthTextBlock.Text = $"Strength: {opponentBoard.GetTotalStrength()}";
 
-			// siły rzędów
 			LocalMeleeStrengthTextBlock.Text = localBoard.GetRowStrength(CardRow.Melee).ToString();
 			LocalRangedStrengthTextBlock.Text = localBoard.GetRowStrength(CardRow.Ranged).ToString();
 			LocalSiegeStrengthTextBlock.Text = localBoard.GetRowStrength(CardRow.Siege).ToString();
@@ -161,25 +161,22 @@ namespace Gwent.Client
 			OpponentRangedStrengthTextBlock.Text = opponentBoard.GetRowStrength(CardRow.Ranged).ToString();
 			OpponentSiegeStrengthTextBlock.Text = opponentBoard.GetRowStrength(CardRow.Siege).ToString();
 
-			// życia
 			LocalLivesTextBlock.Text = $"Lives: {localBoard.LifeTokensRemaining}";
 			OpponentLivesTextBlock.Text = $"Lives: {opponentBoard.LifeTokensRemaining}";
 
-			// leader
 			LocalLeaderTextBlock.Text = $"Leader: {(localBoard.LeaderCard?.Name ?? "-")}";
 			OpponentLeaderTextBlock.Text = $"Leader: {(opponentBoard.LeaderCard?.Name ?? "-")}";
 
-			// deck / graveyard
 			LocalDeckTextBlock.Text = $"Deck: {localBoard.Deck.Count}";
 			OpponentDeckTextBlock.Text = $"Deck: {opponentBoard.Deck.Count}";
 			LocalGraveyardTextBlock.Text = $"Graveyard: {localBoard.Graveyard.Count}";
 			OpponentGraveyardTextBlock.Text = $"Graveyard: {opponentBoard.Graveyard.Count}";
 
-			// pass
+			LocalMulliganTextBlock.Text = $"Mulligans: {localBoard.MulligansRemaining}";
+
 			LocalPassStatusTextBlock.Text = localBoard.HasPassedCurrentRound ? "Passed" : string.Empty;
 			OpponentPassStatusTextBlock.Text = opponentBoard.HasPassedCurrentRound ? "Passed" : string.Empty;
 
-			// pogoda
 			if (boardState.WeatherCards != null && boardState.WeatherCards.Any())
 			{
 				string weatherNames = string.Join(", ", boardState.WeatherCards.Select(c => c.Name));
@@ -190,16 +187,16 @@ namespace Gwent.Client
 				WeatherTextBlock.Text = "Weather: none";
 			}
 
-			// karty na rzędach
-			LocalMeleeRowListBox.ItemsSource = localBoard.MeleeRow.Select(c => $"{c.Name} ({c.CurrentStrength})");
-			LocalRangedRowListBox.ItemsSource = localBoard.RangedRow.Select(c => $"{c.Name} ({c.CurrentStrength})");
-			LocalSiegeRowListBox.ItemsSource = localBoard.SiegeRow.Select(c => $"{c.Name} ({c.CurrentStrength})");
+			LocalMeleeRowListBox.ItemsSource = localBoard.MeleeRow;
+			LocalRangedRowListBox.ItemsSource = localBoard.RangedRow;
+			LocalSiegeRowListBox.ItemsSource = localBoard.SiegeRow;
 
-			OpponentMeleeRowListBox.ItemsSource = opponentBoard.MeleeRow.Select(c => $"{c.Name} ({c.CurrentStrength})");
-			OpponentRangedRowListBox.ItemsSource = opponentBoard.RangedRow.Select(c => $"{c.Name} ({c.CurrentStrength})");
-			OpponentSiegeRowListBox.ItemsSource = opponentBoard.SiegeRow.Select(c => $"{c.Name} ({c.CurrentStrength})");
+			OpponentMeleeRowListBox.ItemsSource = opponentBoard.MeleeRow;
+			OpponentRangedRowListBox.ItemsSource = opponentBoard.RangedRow;
+			OpponentSiegeRowListBox.ItemsSource = opponentBoard.SiegeRow;
 
-			// ręka
+			LocalGraveyardListBox.ItemsSource = localBoard.Graveyard;
+
 			HandListBox.ItemsSource = localBoard.Hand;
 
 			bool isLocalTurn = boardState.ActivePlayerNickname == localBoard.PlayerNickname;
@@ -207,6 +204,18 @@ namespace Gwent.Client
 
 			PlayCardButton.IsEnabled = canPlayOrPass;
 			PassButton.IsEnabled = canPlayOrPass;
+
+			MulliganButton.IsEnabled =
+				boardState.CurrentRoundNumber == 1 &&
+				!boardState.IsGameFinished &&
+				localBoard.MulligansRemaining > 0;
+
+			LeaderAbilityButton.IsEnabled =
+				localBoard.LeaderCard != null &&
+				!localBoard.LeaderAbilityUsed &&
+				!boardState.IsGameFinished &&
+				isLocalTurn;
+
 			SurrenderButton.IsEnabled = !boardState.IsGameFinished;
 
 			if (boardState.IsGameFinished && !gameResultAlreadyShown && boardState.WinnerNickname != null)
@@ -233,17 +242,16 @@ namespace Gwent.Client
 			OpponentMeleeRowListBox.ItemsSource = null;
 			OpponentRangedRowListBox.ItemsSource = null;
 			OpponentSiegeRowListBox.ItemsSource = null;
+			LocalGraveyardListBox.ItemsSource = null;
 			HandListBox.ItemsSource = null;
 		}
 
 		private async void PlayCardButton_Click(object sender, RoutedEventArgs e)
 		{
 			if (gameClientController.CurrentBoardState == null)
-			{
 				return;
-			}
 
-			GwentCard? selectedCard = HandListBox.SelectedItem as GwentCard;
+			var selectedCard = HandListBox.SelectedItem as GwentCard;
 			if (selectedCard == null)
 			{
 				MessageBox.Show("Select a card in your hand first.", "Info",
@@ -251,9 +259,9 @@ namespace Gwent.Client
 				return;
 			}
 
-			GameBoardState boardState = gameClientController.CurrentBoardState;
+			var boardState = gameClientController.CurrentBoardState;
 
-			PlayerBoardState localBoard =
+			var localBoard =
 				gameClientController.LocalPlayerRole == GameRole.Host
 					? boardState.HostPlayerBoard
 					: boardState.GuestPlayerBoard;
@@ -272,7 +280,66 @@ namespace Gwent.Client
 				return;
 			}
 
-			GameActionPayload actionPayload = new GameActionPayload
+			// targetowalne:
+			if (selectedCard.HasAbility(CardAbilityType.Medic))
+			{
+				if (!localBoard.Graveyard.Any(c => c.Category == CardCategory.Unit && !c.IsHero))
+				{
+					MessageBox.Show("No valid Medic targets in your graveyard.", "Info",
+						MessageBoxButton.OK, MessageBoxImage.Information);
+					return;
+				}
+
+				pendingSourceCard = selectedCard;
+				pendingTargetType = PendingTargetType.MedicFromGraveyard;
+				MessageBox.Show("Select a unit in your graveyard as Medic target.", "Target selection",
+					MessageBoxButton.OK, MessageBoxImage.Information);
+				return;
+			}
+
+			if (selectedCard.HasAbility(CardAbilityType.Decoy))
+			{
+				bool hasTarget =
+					localBoard.MeleeRow.Any(c => c.Category == CardCategory.Unit && !c.IsHero) ||
+					localBoard.RangedRow.Any(c => c.Category == CardCategory.Unit && !c.IsHero) ||
+					localBoard.SiegeRow.Any(c => c.Category == CardCategory.Unit && !c.IsHero);
+
+				if (!hasTarget)
+				{
+					MessageBox.Show("No valid Decoy targets on your board.", "Info",
+						MessageBoxButton.OK, MessageBoxImage.Information);
+					return;
+				}
+
+				pendingSourceCard = selectedCard;
+				pendingTargetType = PendingTargetType.DecoyFromBoard;
+				MessageBox.Show("Select a unit on your board as Decoy target.", "Target selection",
+					MessageBoxButton.OK, MessageBoxImage.Information);
+				return;
+			}
+
+			if (selectedCard.HasAbility(CardAbilityType.Mardroeme))
+			{
+				bool hasTarget =
+					localBoard.MeleeRow.Any(c => c.Category == CardCategory.Unit && !c.IsHero) ||
+					localBoard.RangedRow.Any(c => c.Category == CardCategory.Unit && !c.IsHero) ||
+					localBoard.SiegeRow.Any(c => c.Category == CardCategory.Unit && !c.IsHero);
+
+				if (!hasTarget)
+				{
+					MessageBox.Show("No valid Mardroeme targets on your board.", "Info",
+						MessageBoxButton.OK, MessageBoxImage.Information);
+					return;
+				}
+
+				pendingSourceCard = selectedCard;
+				pendingTargetType = PendingTargetType.MardroemeFromBoard;
+				MessageBox.Show("Select a unit on your board as Mardroeme target.", "Target selection",
+					MessageBoxButton.OK, MessageBoxImage.Information);
+				return;
+			}
+
+			var actionPayload = new GameActionPayload
 			{
 				ActionType = GameActionType.PlayCard,
 				ActingPlayerNickname = localBoard.PlayerNickname,
@@ -283,16 +350,83 @@ namespace Gwent.Client
 			await gameClientController.SendGameActionAsync(actionPayload);
 		}
 
-		private async void PassButton_Click(object sender, RoutedEventArgs e)
+		private async void MulliganButton_Click(object sender, RoutedEventArgs e)
 		{
 			if (gameClientController.CurrentBoardState == null)
+				return;
+
+			var boardState = gameClientController.CurrentBoardState;
+
+			var localBoard =
+				gameClientController.LocalPlayerRole == GameRole.Host
+					? boardState.HostPlayerBoard
+					: boardState.GuestPlayerBoard;
+
+			if (boardState.CurrentRoundNumber != 1)
 			{
+				MessageBox.Show("Mulligan is only available in round 1.", "Info",
+					MessageBoxButton.OK, MessageBoxImage.Information);
 				return;
 			}
 
-			GameBoardState boardState = gameClientController.CurrentBoardState;
+			if (localBoard.MulligansRemaining <= 0)
+			{
+				MessageBox.Show("You have no mulligans left.", "Info",
+					MessageBoxButton.OK, MessageBoxImage.Information);
+				return;
+			}
 
-			PlayerBoardState localBoard =
+			var selectedCard = HandListBox.SelectedItem as GwentCard;
+			if (selectedCard == null)
+			{
+				MessageBox.Show("Select a card in your hand to mulligan.", "Info",
+					MessageBoxButton.OK, MessageBoxImage.Information);
+				return;
+			}
+
+			var actionPayload = new GameActionPayload
+			{
+				ActionType = GameActionType.Mulligan,
+				ActingPlayerNickname = localBoard.PlayerNickname,
+				CardInstanceId = selectedCard.InstanceId
+			};
+
+			await gameClientController.SendGameActionAsync(actionPayload);
+		}
+
+		private async void LeaderAbilityButton_Click(object sender, RoutedEventArgs e)
+		{
+			if (gameClientController.CurrentBoardState == null)
+				return;
+
+			var boardState = gameClientController.CurrentBoardState;
+
+			var localBoard =
+				gameClientController.LocalPlayerRole == GameRole.Host
+					? boardState.HostPlayerBoard
+					: boardState.GuestPlayerBoard;
+
+			if (localBoard.LeaderCard == null || localBoard.LeaderAbilityUsed)
+				return;
+
+			var actionPayload = new GameActionPayload
+			{
+				ActionType = GameActionType.UseLeaderAbility,
+				ActingPlayerNickname = localBoard.PlayerNickname,
+				CardInstanceId = localBoard.LeaderCard.InstanceId
+			};
+
+			await gameClientController.SendGameActionAsync(actionPayload);
+		}
+
+		private async void PassButton_Click(object sender, RoutedEventArgs e)
+		{
+			if (gameClientController.CurrentBoardState == null)
+				return;
+
+			var boardState = gameClientController.CurrentBoardState;
+
+			var localBoard =
 				gameClientController.LocalPlayerRole == GameRole.Host
 					? boardState.HostPlayerBoard
 					: boardState.GuestPlayerBoard;
@@ -311,7 +445,7 @@ namespace Gwent.Client
 				return;
 			}
 
-			GameActionPayload actionPayload = new GameActionPayload
+			var actionPayload = new GameActionPayload
 			{
 				ActionType = GameActionType.PassTurn,
 				ActingPlayerNickname = localBoard.PlayerNickname
@@ -323,13 +457,11 @@ namespace Gwent.Client
 		private async void SurrenderButton_Click(object sender, RoutedEventArgs e)
 		{
 			if (gameClientController.CurrentBoardState == null)
-			{
 				return;
-			}
 
-			GameBoardState boardState = gameClientController.CurrentBoardState;
+			var boardState = gameClientController.CurrentBoardState;
 
-			PlayerBoardState localBoard =
+			var localBoard =
 				gameClientController.LocalPlayerRole == GameRole.Host
 					? boardState.HostPlayerBoard
 					: boardState.GuestPlayerBoard;
@@ -341,15 +473,87 @@ namespace Gwent.Client
 				MessageBoxImage.Question);
 
 			if (result != MessageBoxResult.Yes)
-			{
 				return;
-			}
 
-			GameActionPayload actionPayload = new GameActionPayload
+			var actionPayload = new GameActionPayload
 			{
 				ActionType = GameActionType.Resign,
 				ActingPlayerNickname = localBoard.PlayerNickname
 			};
+
+			await gameClientController.SendGameActionAsync(actionPayload);
+		}
+
+		private async void LocalGraveyardListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+		{
+			if (pendingTargetType != PendingTargetType.MedicFromGraveyard || pendingSourceCard == null)
+				return;
+
+			var targetCard = LocalGraveyardListBox.SelectedItem as GwentCard;
+			if (targetCard == null)
+				return;
+
+			var boardState = gameClientController.CurrentBoardState;
+			if (boardState == null)
+				return;
+
+			var localBoard =
+				gameClientController.LocalPlayerRole == GameRole.Host
+					? boardState.HostPlayerBoard
+					: boardState.GuestPlayerBoard;
+
+			var actionPayload = new GameActionPayload
+			{
+				ActionType = GameActionType.PlayCard,
+				ActingPlayerNickname = localBoard.PlayerNickname,
+				CardInstanceId = pendingSourceCard.InstanceId,
+				TargetInstanceId = targetCard.InstanceId
+			};
+
+			pendingSourceCard = null;
+			pendingTargetType = PendingTargetType.None;
+			LocalGraveyardListBox.SelectedItem = null;
+
+			await gameClientController.SendGameActionAsync(actionPayload);
+		}
+
+		private async void LocalBoardRow_SelectionChanged(object sender, SelectionChangedEventArgs e)
+		{
+			if ((pendingTargetType != PendingTargetType.DecoyFromBoard &&
+				 pendingTargetType != PendingTargetType.MardroemeFromBoard) ||
+				pendingSourceCard == null)
+			{
+				return;
+			}
+
+			var listBox = sender as ListBox;
+			if (listBox == null)
+				return;
+
+			var targetCard = listBox.SelectedItem as GwentCard;
+			if (targetCard == null)
+				return;
+
+			var boardState = gameClientController.CurrentBoardState;
+			if (boardState == null)
+				return;
+
+			var localBoard =
+				gameClientController.LocalPlayerRole == GameRole.Host
+					? boardState.HostPlayerBoard
+					: boardState.GuestPlayerBoard;
+
+			var actionPayload = new GameActionPayload
+			{
+				ActionType = GameActionType.PlayCard,
+				ActingPlayerNickname = localBoard.PlayerNickname,
+				CardInstanceId = pendingSourceCard.InstanceId,
+				TargetInstanceId = targetCard.InstanceId
+			};
+
+			pendingSourceCard = null;
+			pendingTargetType = PendingTargetType.None;
+			listBox.SelectedItem = null;
 
 			await gameClientController.SendGameActionAsync(actionPayload);
 		}

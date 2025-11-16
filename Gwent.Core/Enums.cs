@@ -1,8 +1,5 @@
 ﻿namespace Gwent.Core
 {
-	/// <summary>
-	/// Frakcja talii / karty.
-	/// </summary>
 	public enum FactionType
 	{
 		Neutral,
@@ -12,21 +9,15 @@
 		Monsters
 	}
 
-	/// <summary>
-	/// Rząd, na którym karta normalnie się znajduje.
-	/// </summary>
 	public enum CardRow
 	{
 		Melee,
 		Ranged,
 		Siege,
-		Agile,        // karta może być zagrana na kilku rzędach
-		WeatherGlobal // efekt wpływa globalnie
+		Agile,
+		WeatherGlobal
 	}
 
-	/// <summary>
-	/// Kategoria karty (rodzaj).
-	/// </summary>
 	public enum CardCategory
 	{
 		Unit,
@@ -36,24 +27,32 @@
 		Leader
 	}
 
-	/// <summary>
-	/// Typ zdolności (efektu) karty.
-	/// </summary>
 	public enum CardAbilityType
 	{
 		None,
 
-		// klasyczne efekty Gwinta:
+		// jednostki:
+		Spy,
+		Medic,
+		TightBond,
+		Muster,
+		Agile,
 		MoralBoost,
 		CommandersHorn,
-		TightBond,
-		Medic,
-		Spy,
-		Muster,
 		Scorch,
+		Hero,
 
-		// pogoda:
-		Weather,
-		ClearWeather
+		// Pogoda:
+		WeatherBitingFrost,
+		WeatherImpenetrableFog,
+		WeatherTorrentialRain,
+		ClearWeather,
+
+		// Specjalne:
+		Decoy,
+		Mardroeme,
+
+		// Zdolności dowódców:
+		LeaderAbility_DrawExtraCard
 	}
 }

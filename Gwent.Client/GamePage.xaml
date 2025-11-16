@@ -28,6 +28,7 @@
                     <TextBlock x:Name="LocalLeaderTextBlock" FontSize="12"/>
                     <TextBlock x:Name="LocalDeckTextBlock" FontSize="11"/>
                     <TextBlock x:Name="LocalGraveyardTextBlock" FontSize="11"/>
+                    <TextBlock x:Name="LocalMulliganTextBlock" FontSize="11"/>
                     <TextBlock x:Name="LocalPassStatusTextBlock" FontSize="11" Foreground="DarkOrange"/>
                 </StackPanel>
 
@@ -58,13 +59,14 @@
             </Grid>
         </Border>
 
-        <!-- Plansza: rzędy graczy z wynikiem każdego rzędu -->
+        <!-- Plansza: rzędy graczy z wynikiem każdego rzędu oraz graveyard -->
         <Grid Grid.Row="1" Margin="0,10,0,10">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
             <TextBlock Grid.Row="0" Text="Opponent rows" FontWeight="Bold" Margin="0,0,0,5"/>
@@ -85,7 +87,8 @@
                             <TextBlock Text=")" />
                         </StackPanel>
                     </GroupBox.Header>
-                    <ListBox x:Name="OpponentMeleeRowListBox" />
+                    <ListBox x:Name="OpponentMeleeRowListBox"
+                             DisplayMemberPath="Name" />
                 </GroupBox>
 
                 <GroupBox Grid.Row="1" Margin="0,0,0,5">
@@ -97,7 +100,8 @@
                             <TextBlock Text=")" />
                         </StackPanel>
                     </GroupBox.Header>
-                    <ListBox x:Name="OpponentRangedRowListBox" />
+                    <ListBox x:Name="OpponentRangedRowListBox"
+                             DisplayMemberPath="Name" />
                 </GroupBox>
 
                 <GroupBox Grid.Row="2">
@@ -109,7 +113,8 @@
                             <TextBlock Text=")" />
                         </StackPanel>
                     </GroupBox.Header>
-                    <ListBox x:Name="OpponentSiegeRowListBox" />
+                    <ListBox x:Name="OpponentSiegeRowListBox"
+                             DisplayMemberPath="Name" />
                 </GroupBox>
             </Grid>
 
@@ -131,7 +136,9 @@
                             <TextBlock Text=")" />
                         </StackPanel>
                     </GroupBox.Header>
-                    <ListBox x:Name="LocalMeleeRowListBox" />
+                    <ListBox x:Name="LocalMeleeRowListBox"
+                             DisplayMemberPath="Name"
+                             SelectionChanged="LocalBoardRow_SelectionChanged" />
                 </GroupBox>
 
                 <GroupBox Grid.Row="1" Margin="0,0,0,5">
@@ -143,7 +150,9 @@
                             <TextBlock Text=")" />
                         </StackPanel>
                     </GroupBox.Header>
-                    <ListBox x:Name="LocalRangedRowListBox" />
+                    <ListBox x:Name="LocalRangedRowListBox"
+                             DisplayMemberPath="Name"
+                             SelectionChanged="LocalBoardRow_SelectionChanged" />
                 </GroupBox>
 
                 <GroupBox Grid.Row="2">
@@ -155,9 +164,19 @@
                             <TextBlock Text=")" />
                         </StackPanel>
                     </GroupBox.Header>
-                    <ListBox x:Name="LocalSiegeRowListBox" />
+                    <ListBox x:Name="LocalSiegeRowListBox"
+                             DisplayMemberPath="Name"
+                             SelectionChanged="LocalBoardRow_SelectionChanged" />
                 </GroupBox>
             </Grid>
+
+            <!-- Twój graveyard (potrzebny do targetowania Medica) -->
+            <GroupBox Grid.Row="4" Header="Your graveyard" Margin="0,10,0,0">
+                <ListBox x:Name="LocalGraveyardListBox"
+                         Height="80"
+                         DisplayMemberPath="Name"
+                         SelectionChanged="LocalGraveyardListBox_SelectionChanged"/>
+            </GroupBox>
         </Grid>
 
         <!-- Ręka + przyciski -->
@@ -174,6 +193,16 @@
                         Width="150"
                         Margin="0,0,10,0"
                         Click="PlayCardButton_Click"/>
+                <Button x:Name="MulliganButton"
+                        Content="Mulligan"
+                        Width="90"
+                        Margin="0,0,10,0"
+                        Click="MulliganButton_Click"/>
+                <Button x:Name="LeaderAbilityButton"
+                        Content="Use Leader Ability"
+                        Width="130"
+                        Margin="0,0,10,0"
+                        Click="LeaderAbilityButton_Click"/>
                 <Button x:Name="PassButton"
                         Content="Pass"
                         Width="80"
