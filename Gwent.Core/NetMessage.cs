@@ -1,24 +1,14 @@
-﻿namespace Gwent.Core
+﻿namespace Gwent.Core;
+
+public class NetMessage
 {
-	public class NetMessage
-	{
-		// "join", "state", "playCard", "pass", "error"
-		public string Type { get; set; } = string.Empty;
+	public string Type { get; set; } = "";
 
-		// używane głównie po stronie serwera (opcjonalne)
-		public string? PlayerId { get; set; }
-
-		// przy "join" – nick gracza
-		public string? PlayerName { get; set; }
-
-		// przy "playCard"
-		public string? CardId { get; set; }
-		public Row TargetRow { get; set; }
-
-		// przy "state"
-		public GameState? GameState { get; set; }
-
-		// przy "error"
-		public string? Error { get; set; }
-	}
+	public string? PlayerId { get; set; }
+	public string? Name { get; set; }
+	public string? CardId { get; set; }
+	public Row TargetRow { get; set; }
+	public bool? IsHost { get; set; }
+	public GameState? GameState { get; set; }
+	public string? Error { get; set; }
 }

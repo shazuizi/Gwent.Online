@@ -1,35 +1,32 @@
-﻿namespace Gwent.Core
+﻿namespace Gwent.Core;
+
+public enum CardType
 {
-	public enum CardType
-	{
-		Unit,
-		Weather,
-		Special
-	}
+	Unit,
+	Weather,
+	Special
+}
 
-	public enum Row
-	{
-		None,
-		Melee,
-		Ranged,
-		Siege
-	}
+public enum Row
+{
+	None,
+	Melee,
+	Ranged,
+	Siege
+}
 
-	public enum Ability
-	{
-		None,
-		Spy,
-		TightBond,
-		Morale,
-		Medic
-	}
+public enum Ability
+{
+	None,
+	Spy,
+	TightBond,
+	Morale,
+	Medic
+}
 
-	public enum GamePhase
-	{
-		WaitingForPlayers,
-		Mulligan,
-		Playing,
-		RoundEnd,
-		GameEnd
-	}
+public enum GamePhase
+{
+	WaitingForPlayers,
+	Playing,
+	GameEnd
 }

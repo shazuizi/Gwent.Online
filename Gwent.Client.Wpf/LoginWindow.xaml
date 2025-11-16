@@ -1,46 +1,27 @@
 ﻿<Window x:Class="Gwent.Client.Wpf.LoginWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Gwint Online - Logowanie" Height="250" Width="400"
-        WindowStartupLocation="CenterScreen">
-    <Grid Margin="10">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
+        Title="Login" Height="250" Width="400">
+    
 
-        <!-- Nick -->
-        <StackPanel Orientation="Horizontal" Grid.Row="0" Margin="0,0,0,10">
-            <TextBlock Text="Nick:" Width="80" VerticalAlignment="Center"/>
-            <TextBox x:Name="TxtNick" Width="250"/>
+    <StackPanel Margin="0,10,0,0">
+        <RadioButton x:Name="RbHost" Content="Host" GroupName="Mode"/>
+        <RadioButton x:Name="RbJoin" Content="Join" GroupName="Mode" IsChecked="True"/>
+
+        <StackPanel Margin="0,10,0,0">
+            
+            <TextBlock Text="Name:" Margin="0,10,0,0"/>
+            <TextBox x:Name="TxtName" Text="Player"/>
+            
+            <TextBlock Text="Address:"/>
+            <TextBox x:Name="TxtServerAddress" Text="127.0.0.1"/>
+
+            <TextBlock Text="Port:" Margin="0,10,0,0"/>
+            <TextBox x:Name="TxtPort" Text="9000"/>
+
         </StackPanel>
 
-        <!-- Tryb -->
-        <StackPanel Orientation="Horizontal" Grid.Row="1" Margin="0,0,0,10">
-            <TextBlock Text="Tryb:" Width="80" VerticalAlignment="Center"/>
-            <RadioButton x:Name="RbHost" Content="Hostuj" Margin="0,0,10,0"/>
-            <RadioButton x:Name="RbJoin" Content="Dołącz"/>
-        </StackPanel>
+        <Button x:Name="BtnOk" Content="OK" Width="120" Margin="0,20,0,0" Click="BtnOk_Click"/>
+    </StackPanel>
 
-        <!-- Adres -->
-        <StackPanel Orientation="Horizontal" Grid.Row="2" Margin="0,0,0,10">
-            <TextBlock Text="Adres serwera:" Width="80" VerticalAlignment="Center"/>
-            <TextBox x:Name="TxtAddress" Width="250"/>
-        </StackPanel>
-
-        <!-- Port -->
-        <StackPanel Orientation="Horizontal" Grid.Row="3">
-            <TextBlock Text="Port:" Width="80" VerticalAlignment="Center"/>
-            <TextBox x:Name="TxtPort" Width="80"/>
-        </StackPanel>
-
-        <!-- Przyciski -->
-        <StackPanel Orientation="Horizontal" Grid.Row="4" HorizontalAlignment="Right" Margin="0,10,0,0">
-            <Button Content="OK" Width="80" Margin="0,0,10,0" Click="BtnOk_Click"/>
-            <Button Content="Anuluj" Width="80" Click="BtnCancel_Click"/>
-        </StackPanel>
-    </Grid>
 </Window>

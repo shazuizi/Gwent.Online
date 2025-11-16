@@ -16,7 +16,7 @@
 		public PlayerState GetOpponent(string id) =>
 			Player1.PlayerId == id ? Player2 : Player1;
 
+		public string CurrentPlayer { get; set; } = "";
 
 	}
-
 }
