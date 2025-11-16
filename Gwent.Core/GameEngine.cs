@@ -723,9 +723,22 @@ namespace Gwent.Core
 
 		private void SwitchTurnToOpponent(string currentPlayerNickname)
 		{
-			var opponent = GetOpponentBoard(currentPlayerNickname);
-			BoardState.ActivePlayerNickname = opponent.PlayerNickname;
+			var currentPlayer = GetPlayerBoard(currentPlayerNickname);
+			var opponentPlayer = GetOpponentBoard(currentPlayerNickname);
+
+			// Jeśli przeciwnik już spasował, a bieżący gracz NIE spasował,
+			// to tura musi zostać przy bieżącym graczu (on dogrywa sam do końca rundy).
+			if (opponentPlayer.HasPassedCurrentRound && !currentPlayer.HasPassedCurrentRound)
+			{
+				BoardState.ActivePlayerNickname = currentPlayer.PlayerNickname;
+			}
+			else
+			{
+				// normalny przypadek – zmiana tury
+				BoardState.ActivePlayerNickname = opponentPlayer.PlayerNickname;
+			}
 		}
+
 
 		#endregion
 
