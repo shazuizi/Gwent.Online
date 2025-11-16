@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using Gwent.Core;
 
 namespace Gwent.Client
@@ -27,7 +28,7 @@ namespace Gwent.Client
 		private CardRow? pendingMedicRow;
 
 		/// <summary>
-		/// Karta wybrana w ręce – wyświetlamy jej detale, a klik na rząd/ pole powoduje zagranie.
+		/// Aktualnie wybrana karta w ręce (kliknięta w HandListBox).
 		/// </summary>
 		private GwentCard? selectedHandCard;
 
@@ -62,7 +63,9 @@ namespace Gwent.Client
 		{
 			Dispatcher.Invoke(() =>
 			{
-				MessageBox.Show("Connection to server was lost.", "Disconnected", MessageBoxButton.OK, MessageBoxImage.Warning);
+				MessageBox.Show("Connection to server was lost.", "Disconnected",
+					MessageBoxButton.OK, MessageBoxImage.Warning);
+
 				mainWindow.CurrentGameClientController?.TryStopServerProcess();
 				mainWindow.CurrentGameClientController = null;
 				mainWindow.NavigateToMainMenuPage();
@@ -71,7 +74,7 @@ namespace Gwent.Client
 
 		#endregion
 
-		#region UI – nicki, role, ogólne informacje
+		#region UI – nicki, plansza, itp.
 
 		private void UpdatePlayerNicknamesFromSessionConfiguration()
 		{
@@ -225,8 +228,7 @@ namespace Gwent.Client
 				!boardState.IsGameFinished &&
 				!isMulliganPhaseForLocal;
 
-			// przycisk Play służy tylko jako przypominajka – gra się przez kliknięcie rzędu
-			PlayCardButton.IsEnabled = canPlayOrPass;
+			PlayCardButton.IsEnabled = canPlayOrPass;   // Play dla kart globalnych (pogoda, Scorch)
 			PassButton.IsEnabled = canPlayOrPass;
 
 			MulliganButton.IsEnabled =
@@ -262,14 +264,14 @@ namespace Gwent.Client
 					message = "You lost the game.";
 				}
 
-				MessageBox.Show(message, "Game finished", MessageBoxButton.OK, MessageBoxImage.Information);
+				MessageBox.Show(message, "Game finished",
+					MessageBoxButton.OK, MessageBoxImage.Information);
 
 				mainWindow.CurrentGameClientController?.TryStopServerProcess();
 				mainWindow.CurrentGameClientController = null;
 				mainWindow.NavigateToMainMenuPage();
 			}
 
-			// odśwież panel informacji o karcie (mogły zmienić się siły itp.)
 			UpdateSelectedCardPanel();
 		}
 
@@ -302,7 +304,6 @@ namespace Gwent.Client
 			}
 
 			SelectedCardNameTextBlock.Text = selectedHandCard.Name;
-
 			SelectedCardFactionTextBlock.Text = $"Faction: {selectedHandCard.Faction}";
 			SelectedCardCategoryTextBlock.Text = $"Category: {selectedHandCard.Category}";
 			SelectedCardStrengthTextBlock.Text =
@@ -328,7 +329,7 @@ namespace Gwent.Client
 			selectedHandCard = HandListBox.SelectedItem as GwentCard;
 			UpdateSelectedCardPanel();
 
-			// przy wyborze nowej karty w ręce kasujemy ewentualne stare tryby targetowania
+			// reset trybów targetowania przy wyborze nowej karty
 			pendingTargetType = PendingTargetType.None;
 			pendingSourceCard = null;
 			pendingMedicRow = null;
@@ -336,7 +337,51 @@ namespace Gwent.Client
 
 		#endregion
 
-		#region Obsługa planszy – kliknięcia w rzędy
+		#region Klikanie w rzędy (GroupBoxy)
+
+		private async void LocalRowGroupBox_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+		{
+			if (selectedHandCard == null)
+				return;
+
+			var groupBox = sender as GroupBox;
+			if (groupBox?.Tag is not string tag)
+				return;
+
+			CardRow row = tag switch
+			{
+				"Melee" => CardRow.Melee,
+				"Ranged" => CardRow.Ranged,
+				"Siege" => CardRow.Siege,
+				_ => CardRow.Melee
+			};
+
+			await PlayHandCardOnRowAsync(selectedHandCard, row, isOpponentRow: false);
+		}
+
+		private async void OpponentRowGroupBox_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+		{
+			if (selectedHandCard == null)
+				return;
+
+			var groupBox = sender as GroupBox;
+			if (groupBox?.Tag is not string tag)
+				return;
+
+			CardRow row = tag switch
+			{
+				"Melee" => CardRow.Melee,
+				"Ranged" => CardRow.Ranged,
+				"Siege" => CardRow.Siege,
+				_ => CardRow.Melee
+			};
+
+			await PlayHandCardOnRowAsync(selectedHandCard, row, isOpponentRow: true);
+		}
+
+		#endregion
+
+		#region ListBoxy rzędów – tylko targety (Decoy/Mardroeme) + czyszczenie zaznaczenia
 
 		private async void LocalBoardRow_SelectionChanged(object sender, SelectionChangedEventArgs e)
 		{
@@ -345,20 +390,7 @@ namespace Gwent.Client
 				return;
 
 			var clickedCard = listBox.SelectedItem as GwentCard;
-			CardRow row = CardRow.Melee;
 
-			if (listBox.Tag is string tag)
-			{
-				row = tag switch
-				{
-					"Melee" => CardRow.Melee,
-					"Ranged" => CardRow.Ranged,
-					"Siege" => CardRow.Siege,
-					_ => CardRow.Melee
-				};
-			}
-
-			// 1) Tryb targetowania Decoy/Mardroeme – klikamy konkretną jednostkę
 			if ((pendingTargetType == PendingTargetType.DecoyFromBoard ||
 				 pendingTargetType == PendingTargetType.MardroemeFromBoard) &&
 				pendingSourceCard != null &&
@@ -389,73 +421,21 @@ namespace Gwent.Client
 				return;
 			}
 
-			// 2) Brak wybranej karty w ręce – nic nie robimy (to tylko inspekcja planszy)
-			if (selectedHandCard == null)
-			{
-				listBox.SelectedItem = null;
-				return;
-			}
-
-			// 3) Jeśli wybrana karta to Decoy / Mardroeme – wchodzimy w tryb wskazywania celu
-			if (selectedHandCard.HasAbility(CardAbilityType.Decoy))
-			{
-				pendingSourceCard = selectedHandCard;
-				pendingTargetType = PendingTargetType.DecoyFromBoard;
-				MessageBox.Show("Select a unit on your board as Decoy target.", "Target selection",
-					MessageBoxButton.OK, MessageBoxImage.Information);
-				listBox.SelectedItem = null;
-				return;
-			}
-
-			if (selectedHandCard.HasAbility(CardAbilityType.Mardroeme))
-			{
-				pendingSourceCard = selectedHandCard;
-				pendingTargetType = PendingTargetType.MardroemeFromBoard;
-				MessageBox.Show("Select a unit on your board as Mardroeme target.", "Target selection",
-					MessageBoxButton.OK, MessageBoxImage.Information);
-				listBox.SelectedItem = null;
-				return;
-			}
-
-			// 4) Normalne zagranie karty z ręki na nasz rząd (w tym Medic – wybór rzędu)
-			await PlayHandCardOnRowAsync(selectedHandCard, row, isOpponentRow: false);
-
 			listBox.SelectedItem = null;
 		}
 
-		private async void OpponentBoardRow_SelectionChanged(object sender, SelectionChangedEventArgs e)
+		private void OpponentBoardRow_SelectionChanged(object sender, SelectionChangedEventArgs e)
 		{
 			var listBox = sender as ListBox;
 			if (listBox == null)
 				return;
-
-			if (selectedHandCard == null)
-			{
-				listBox.SelectedItem = null;
-				return;
-			}
-
-			CardRow row = CardRow.Melee;
-			if (listBox.Tag is string tag)
-			{
-				row = tag switch
-				{
-					"Melee" => CardRow.Melee,
-					"Ranged" => CardRow.Ranged,
-					"Siege" => CardRow.Siege,
-					_ => CardRow.Melee
-				};
-			}
-
-			// Na rzędy przeciwnika wolno kłaść tylko szpiegów
-			await PlayHandCardOnRowAsync(selectedHandCard, row, isOpponentRow: true);
 
 			listBox.SelectedItem = null;
 		}
 
 		#endregion
 
-		#region Cmentarz – targetowanie Medica
+		#region Cmentarz – Medic
 
 		private async void LocalGraveyardListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
 		{
@@ -494,7 +474,7 @@ namespace Gwent.Client
 
 		#endregion
 
-		#region Logika zagrywania karty z ręki na wybrany rząd
+		#region Zagrywanie karty z ręki na rząd / globalnie
 
 		private async Task PlayHandCardOnRowAsync(GwentCard card, CardRow row, bool isOpponentRow)
 		{
@@ -533,7 +513,29 @@ namespace Gwent.Client
 				return;
 			}
 
-			// Szpieg – dozwolony tylko na rzędy przeciwnika
+			// Globalne karty (pogoda, ClearWeather, globalny Scorch) powinny być grane bez wybierania kolumny.
+			// Tu zabezpieczamy się – jeśli ktoś kliknie rząd taką kartą, i tak gramy globalnie.
+			bool isGlobalSpecial =
+				card.Category == CardCategory.Weather ||
+				(card.Category == CardCategory.Special &&
+				 (card.HasAbility(CardAbilityType.Scorch) ||
+				  card.HasAbility(CardAbilityType.ClearWeather)));
+
+			if (isGlobalSpecial)
+			{
+				var actionPayloadGlobal = new GameActionPayload
+				{
+					ActionType = GameActionType.PlayCard,
+					ActingPlayerNickname = localBoard.PlayerNickname,
+					CardInstanceId = card.InstanceId
+					// TargetRow / TargetInstanceId niepotrzebne
+				};
+
+				await gameClientController.SendGameActionAsync(actionPayloadGlobal);
+				return;
+			}
+
+			// Szpieg – tylko na rzędy przeciwnika
 			if (card.HasAbility(CardAbilityType.Spy))
 			{
 				if (!isOpponentRow)
@@ -563,7 +565,7 @@ namespace Gwent.Client
 				return;
 			}
 
-			// Medic – najpierw wybieramy rząd, potem jednostkę w cmentarzu
+			// Medic – wybieramy rząd, potem jednostkę w cmentarzu
 			if (card.HasAbility(CardAbilityType.Medic))
 			{
 				bool hasTarget =
@@ -585,19 +587,20 @@ namespace Gwent.Client
 				return;
 			}
 
-			// Decoy / Mardroeme – ich logika jest inicjowana przez klik na planszy (LocalBoardRow_SelectionChanged)
+			// Decoy / Mardroeme – logika przez klik jednostki na planszy
 			if (card.HasAbility(CardAbilityType.Decoy) || card.HasAbility(CardAbilityType.Mardroeme))
 			{
-				MessageBox.Show("Select a unit on your board as target for this card.", "Target selection",
-					MessageBoxButton.OK, MessageBoxImage.Information);
 				pendingSourceCard = card;
 				pendingTargetType = card.HasAbility(CardAbilityType.Decoy)
 					? PendingTargetType.DecoyFromBoard
 					: PendingTargetType.MardroemeFromBoard;
+
+				MessageBox.Show("Select a unit on your board as target for this card.", "Target selection",
+					MessageBoxButton.OK, MessageBoxImage.Information);
 				return;
 			}
 
-			// Pozostałe karty – zwykłe zagranie na rząd
+			// Normalne jednostki / rogi / morale / bond itd. – zwykłe zagranie na rząd
 			var actionPayload = new GameActionPayload
 			{
 				ActionType = GameActionType.PlayCard,
@@ -611,9 +614,9 @@ namespace Gwent.Client
 
 		#endregion
 
-		#region Przyciski: Play (podpowiedź), Mulligan, Leader, Pass, Surrender
+		#region Przyciski: Play (globalne karty), Mulligan, Leader, Pass, Surrender
 
-		private void PlayCardButton_Click(object sender, RoutedEventArgs e)
+		private async void PlayCardButton_Click(object sender, RoutedEventArgs e)
 		{
 			if (selectedHandCard == null)
 			{
@@ -622,8 +625,49 @@ namespace Gwent.Client
 				return;
 			}
 
-			MessageBox.Show("Click a row on the board to play the selected card.", "Info",
-				MessageBoxButton.OK, MessageBoxImage.Information);
+			if (gameClientController.CurrentBoardState == null)
+				return;
+
+			var boardState = gameClientController.CurrentBoardState;
+
+			var localBoard =
+				gameClientController.LocalPlayerRole == GameRole.Host
+					? boardState.HostPlayerBoard
+					: boardState.GuestPlayerBoard;
+
+			bool isMulliganPhaseForLocal =
+				boardState.CurrentRoundNumber == 1 &&
+				localBoard.MulligansRemaining > 0;
+
+			if (isMulliganPhaseForLocal)
+			{
+				MessageBox.Show("You must finish your mulligans before playing cards.", "Info",
+					MessageBoxButton.OK, MessageBoxImage.Information);
+				return;
+			}
+
+			bool isGlobalSpecial =
+				selectedHandCard.Category == CardCategory.Weather ||
+				(selectedHandCard.Category == CardCategory.Special &&
+				 (selectedHandCard.HasAbility(CardAbilityType.Scorch) ||
+				  selectedHandCard.HasAbility(CardAbilityType.ClearWeather)));
+
+			if (!isGlobalSpecial)
+			{
+				MessageBox.Show("To play this card: click a row on the board.", "Info",
+					MessageBoxButton.OK, MessageBoxImage.Information);
+				return;
+			}
+
+			// Pogoda / globalny Scorch / ClearWeather – PLAY bez wybierania rzędu
+			var actionPayload = new GameActionPayload
+			{
+				ActionType = GameActionType.PlayCard,
+				ActingPlayerNickname = localBoard.PlayerNickname,
+				CardInstanceId = selectedHandCard.InstanceId
+			};
+
+			await gameClientController.SendGameActionAsync(actionPayload);
 		}
 
 		private async void MulliganButton_Click(object sender, RoutedEventArgs e)
@@ -717,6 +761,17 @@ namespace Gwent.Client
 			if (localBoard.HasPassedCurrentRound)
 			{
 				MessageBox.Show("You have already passed this round.", "Info",
+					MessageBoxButton.OK, MessageBoxImage.Information);
+				return;
+			}
+
+			bool isMulliganPhaseForLocal =
+				boardState.CurrentRoundNumber == 1 &&
+				localBoard.MulligansRemaining > 0;
+
+			if (isMulliganPhaseForLocal)
+			{
+				MessageBox.Show("You must finish your mulligans before passing.", "Info",
 					MessageBoxButton.OK, MessageBoxImage.Information);
 				return;
 			}
