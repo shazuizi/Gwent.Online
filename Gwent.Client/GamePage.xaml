@@ -1,0 +1,52 @@
+﻿<Page x:Class="Gwent.Client.GamePage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Title="GamePage">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Pasek z nickami graczy -->
+        <Border Grid.Row="0" Padding="10" BorderThickness="0,0,0,1" BorderBrush="Gray">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Orientation="Vertical">
+                    <TextBlock Text="You:"
+                               FontWeight="Bold"/>
+                    <TextBlock x:Name="LocalPlayerNicknameTextBlock"
+                               FontSize="16"/>
+                    <TextBlock x:Name="LocalPlayerRoleTextBlock"
+                               FontSize="12"
+                               Foreground="Gray"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Orientation="Vertical" HorizontalAlignment="Right">
+                    <TextBlock Text="Opponent:"
+                               FontWeight="Bold"
+                               HorizontalAlignment="Right"/>
+                    <TextBlock x:Name="OpponentNicknameTextBlock"
+                               FontSize="16"
+                               HorizontalAlignment="Right"/>
+                    <TextBlock x:Name="OpponentRoleTextBlock"
+                               FontSize="12"
+                               Foreground="Gray"
+                               HorizontalAlignment="Right"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Placeholder planszy gry -->
+        <Grid Grid.Row="1">
+            <TextBlock Text="Game Board Placeholder"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       FontSize="24"/>
+        </Grid>
+    </Grid>
+</Page>

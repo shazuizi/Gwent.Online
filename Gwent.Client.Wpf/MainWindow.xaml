@@ -1,49 +1,12 @@
 ﻿<Window x:Class="Gwent.Client.Wpf.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Gwint Online" Height="600" Width="900">
+        Title="Gwent" Height="600" Width="900">
+
     <Grid Margin="10">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <!-- nicki -->
-            <RowDefinition Height="2*"/>
-            <!-- stół -->
-            <RowDefinition Height="Auto"/>
-            <!-- przyciski -->
-            <RowDefinition Height="2*"/>
-            <!-- ręka -->
-        </Grid.RowDefinitions>
-
-        <!-- Nicki -->
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
-            <TextBlock Text="Ty: " FontWeight="Bold"/>
-            <TextBlock x:Name="TxtMeName" Margin="0,0,20,0"/>
-            <TextBlock Text="Przeciwnik: " FontWeight="Bold"/>
-            <TextBlock x:Name="TxtOppName"/>
-        </StackPanel>
-
-        <!-- STÓŁ -->
-        <StackPanel Grid.Row="1">
-            <TextBlock Text="Stół - Twoje karty" FontWeight="Bold" Margin="0,0,0,5" />
-            <TextBlock Text="Melee" FontWeight="SemiBold"/>
-            <ItemsControl x:Name="BoardMelee" Margin="0,0,0,5" />
-            <TextBlock Text="Ranged" FontWeight="SemiBold"/>
-            <ItemsControl x:Name="BoardRanged" Margin="0,0,0,5" />
-            <TextBlock Text="Siege" FontWeight="SemiBold"/>
-            <ItemsControl x:Name="BoardSiege" Margin="0,0,0,5" />
-        </StackPanel>
-
-        <!-- PANEL STEROWANIA -->
-        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,10,0,10">
-            <Button x:Name="BtnPlay" Content="Zagraj kartę" Width="120" Margin="0,0,10,0" Click="BtnPlay_Click"/>
-            <Button x:Name="BtnPass" Content="Pas" Width="80" Click="BtnPass_Click"/>
-            <TextBlock x:Name="TxtStatus" Margin="20,0,0,0" VerticalAlignment="Center"/>
-        </StackPanel>
-
-        <!-- RĘKA -->
-        <StackPanel Grid.Row="3">
-            <TextBlock Text="Twoja ręka" FontWeight="Bold" Margin="0,0,0,5" />
-            <ListBox x:Name="HandList" DisplayMemberPath="Name" />
+        <StackPanel>
+            <TextBlock x:Name="TxtStatus" FontSize="18" Margin="0,10"/>
+            <ListBox x:Name="HandList" Height="300"/>
         </StackPanel>
     </Grid>
 </Window>

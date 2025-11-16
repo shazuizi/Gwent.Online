@@ -7,7 +7,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gwent.Server", "Gwent.Serve
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gwent.Core", "Gwent.Core\Gwent.Core.csproj", "{07176B03-8558-4FC9-8036-17E2F1BFCFD0}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gwent.Client.Wpf", "Gwent.Client.Wpf\Gwent.Client.Wpf.csproj", "{1825417F-B2A1-48B7-B6CD-2CBB61D088EE}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gwent.Client", "Gwent.Client\Gwent.Client.csproj", "{8314D03F-4F42-47FC-8572-16EBBCA09DC8}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -23,10 +23,10 @@ Global
 		{07176B03-8558-4FC9-8036-17E2F1BFCFD0}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{07176B03-8558-4FC9-8036-17E2F1BFCFD0}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{07176B03-8558-4FC9-8036-17E2F1BFCFD0}.Release|Any CPU.Build.0 = Release|Any CPU
-		{1825417F-B2A1-48B7-B6CD-2CBB61D088EE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{1825417F-B2A1-48B7-B6CD-2CBB61D088EE}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{1825417F-B2A1-48B7-B6CD-2CBB61D088EE}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{1825417F-B2A1-48B7-B6CD-2CBB61D088EE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8314D03F-4F42-47FC-8572-16EBBCA09DC8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8314D03F-4F42-47FC-8572-16EBBCA09DC8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8314D03F-4F42-47FC-8572-16EBBCA09DC8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8314D03F-4F42-47FC-8572-16EBBCA09DC8}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

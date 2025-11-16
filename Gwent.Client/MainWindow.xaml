@@ -1,0 +1,11 @@
+﻿<Window x:Class="Gwent.Client.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Gwent Online"
+        Height="600" Width="900">
+    <Grid>
+        <!-- Główny Frame, w którym będą ładowane strony (Page) -->
+        <Frame x:Name="MainFrame"
+               NavigationUIVisibility="Hidden"/>
+    </Grid>
+</Window>
