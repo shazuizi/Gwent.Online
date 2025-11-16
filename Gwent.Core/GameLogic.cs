@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-
-namespace Gwent.Core
+﻿namespace Gwent.Core
 {
 	public static class GameLogic
 	{

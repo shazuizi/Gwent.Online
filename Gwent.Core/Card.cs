@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace Gwent.Core
+﻿namespace Gwent.Core
 {
 	public class Card
 	{

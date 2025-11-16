@@ -1,6 +1,4 @@
-﻿using System.Collections.Generic;
-
-namespace Gwent.Core
+﻿namespace Gwent.Core
 {
 	public class PlayerState
 	{
