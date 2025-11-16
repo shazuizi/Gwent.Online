@@ -2,23 +2,23 @@
 {
 	public class NetMessage
 	{
-		// "join", "joined", "state", "playCard", "pass", "error"
+		// "join", "state", "playCard", "pass", "error"
 		public string Type { get; set; } = string.Empty;
 
+		// używane głównie po stronie serwera (opcjonalne)
 		public string? PlayerId { get; set; }
 
-		public string? Nickname { get; set; }
+		// przy "join" – nick gracza
+		public string? PlayerName { get; set; }
+
+		// przy "playCard"
 		public string? CardId { get; set; }
 		public Row TargetRow { get; set; }
 
-		// Stan gry zwracany przez serwer
+		// przy "state"
 		public GameState? GameState { get; set; }
 
-		// Komunikaty błędów
+		// przy "error"
 		public string? Error { get; set; }
-
-		// Nick gracza przy logowaniu/joinie
-		public string? Nick { get; set; }
 	}
 }
-

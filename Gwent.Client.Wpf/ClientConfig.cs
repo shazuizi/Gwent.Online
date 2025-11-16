@@ -1,52 +1,43 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 using System.Text.Json;
 
 namespace Gwent.Client.Wpf
 {
 	public class ClientConfig
 	{
-		public string Nick { get; set; } = "Gracz";
-		public bool LastIsHost { get; set; } = true;
-		public string LastServerAddress { get; set; } = "127.0.0.1";
-		public int LastPort { get; set; } = 9000;
+		public string Nickname { get; set; } = "Gracz";
+		public string ServerAddress { get; set; } = "127.0.0.1";
+		public int ServerPort { get; set; } = 9000;
+		public bool LastWasHost { get; set; } = true;
 
-		private static string ConfigPath =>
-			Path.Combine(
-				Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-				"GwentPvP",
-				"clientconfig.json");
+		public static string ConfigPath =>
+			Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "gwent.config.json");
 
 		public static ClientConfig Load()
 		{
 			try
 			{
-				if (File.Exists(ConfigPath))
-				{
-					var json = File.ReadAllText(ConfigPath);
-					var cfg = JsonSerializer.Deserialize<ClientConfig>(json);
-					if (cfg != null) return cfg;
-				}
-			}
-			catch { }
+				if (!File.Exists(ConfigPath))
+					return new ClientConfig();
 
-			return new ClientConfig();
+				var json = File.ReadAllText(ConfigPath);
+				var cfg = JsonSerializer.Deserialize<ClientConfig>(json);
+				return cfg ?? new ClientConfig();
+			}
+			catch
+			{
+				return new ClientConfig();
+			}
 		}
 
 		public void Save()
 		{
-			try
+			var json = JsonSerializer.Serialize(this, new JsonSerializerOptions
 			{
-				var dir = Path.GetDirectoryName(ConfigPath)!;
-				if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
-
-				var json = JsonSerializer.Serialize(this, new JsonSerializerOptions
-				{
-					WriteIndented = true
-				});
-
-				File.WriteAllText(ConfigPath, json);
-			}
-			catch { }
+				WriteIndented = true
+			});
+			File.WriteAllText(ConfigPath, json);
 		}
 	}
 }
