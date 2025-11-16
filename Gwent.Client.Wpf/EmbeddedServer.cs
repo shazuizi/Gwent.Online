@@ -7,28 +7,29 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Gwent.Core;
 
-namespace Gwent.Server
+namespace Gwent.Client.Wpf
 {
-	internal class Program
+	public static class EmbeddedServer
 	{
-		static async Task Main(string[] args)
+		private static bool _running;
+
+		public static async Task StartAsync(int port)
 		{
-			// Domyślny port
-			int port = 9000;
+			if (_running) return;
+			_running = true;
 
-			// Jeśli został podany w argumentach, spróbuj użyć
-			if (args.Length > 0 && int.TryParse(args[0], out var parsedPort))
-			{
-				port = parsedPort;
-			}
+			_ = Task.Run(() => RunServer(port));
+			await Task.Delay(100); // mała pauza, żeby listener ruszył
+		}
 
+		private static async Task RunServer(int port)
+		{
 			var listener = new TcpListener(IPAddress.Any, port);
 			listener.Start();
 			Console.WriteLine($"Serwer Gwinta: nasłuchuję na porcie {port}...");
 
 			var clientSockets = new List<TcpClient>();
 
-			// Czekamy na 2 graczy
 			while (clientSockets.Count < 2)
 			{
 				var client = await listener.AcceptTcpClientAsync();
@@ -36,7 +37,6 @@ namespace Gwent.Server
 				Console.WriteLine($"Gracz {clientSockets.Count} połączony.");
 			}
 
-			// Tworzymy stan gry
 			var gameState = new GameState
 			{
 				Player1 = new PlayerState { PlayerId = "P1", Name = "Gracz 1" },
@@ -46,18 +46,13 @@ namespace Gwent.Server
 			GameLogic.StartGame(gameState);
 			Console.WriteLine("Gra rozpoczęta.");
 
-			// Start obsługi każdego gracza
 			_ = HandleClient("P1", clientSockets[0], gameState, clientSockets);
 			_ = HandleClient("P2", clientSockets[1], gameState, clientSockets);
 
 			await Task.Delay(Timeout.Infinite);
 		}
 
-		private static async Task HandleClient(
-			string playerId,
-			TcpClient client,
-			GameState gameState,
-			List<TcpClient> allClients)
+		private static async Task HandleClient(string playerId, TcpClient client, GameState gameState, List<TcpClient> allClients)
 		{
 			using var stream = client.GetStream();
 			await SendStateToAll(allClients, gameState);
@@ -70,7 +65,7 @@ namespace Gwent.Server
 				try
 				{
 					bytes = await stream.ReadAsync(buffer);
-					if (bytes == 0) break; // klient się rozłączył
+					if (bytes == 0) break;
 				}
 				catch
 				{
@@ -113,14 +108,13 @@ namespace Gwent.Server
 				Type = "state",
 				GameState = gameState
 			};
-
 			var json = JsonSerializer.Serialize(msg);
 			var bytes = Encoding.UTF8.GetBytes(json);
 
-			foreach (var client in clients)
+			foreach (var c in clients)
 			{
-				var stream = client.GetStream();
-				await stream.WriteAsync(bytes);
+				var s = c.GetStream();
+				await s.WriteAsync(bytes);
 			}
 		}
 	}
