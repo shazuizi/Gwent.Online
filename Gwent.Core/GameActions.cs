@@ -6,7 +6,8 @@
 	public enum GameActionType
 	{
 		PlayCard,
-		PassTurn
+		PassTurn,
+		Resign
 	}
 
 	/// <summary>
@@ -15,7 +16,7 @@
 	public class GameActionPayload
 	{
 		/// <summary>
-		/// Typ akcji (zagranie karty, pass).
+		/// Typ akcji (zagranie karty, pass, poddanie).
 		/// </summary>
 		public GameActionType ActionType { get; set; }
 

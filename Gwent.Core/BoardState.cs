@@ -18,8 +18,21 @@ namespace Gwent.Core
 		public List<GwentCard> RangedRow { get; set; } = new List<GwentCard>();
 		public List<GwentCard> SiegeRow { get; set; } = new List<GwentCard>();
 
+		/// <summary>
+		/// Czy gracz zapasował w bieżącej rundzie.
+		/// </summary>
 		public bool HasPassedCurrentRound { get; set; }
+
+		/// <summary>
+		/// Liczba wygranych rund.
+		/// </summary>
 		public int RoundsWon { get; set; }
+
+		/// <summary>
+		/// Liczba pozostałych „żyć” / znaczników (standardowo 2).
+		/// Tracisz 1 życie przy przegranej rundzie.
+		/// </summary>
+		public int LifeTokensRemaining { get; set; } = 2;
 
 		/// <summary>
 		/// Zwraca sumę siły na wszystkich rzędach (po aktualnych buffach/debuffach).
@@ -45,6 +58,9 @@ namespace Gwent.Core
 		/// </summary>
 		public string ActivePlayerNickname { get; set; } = string.Empty;
 
+		/// <summary>
+		/// Numer bieżącej rundy (od 1 w górę).
+		/// </summary>
 		public int CurrentRoundNumber { get; set; } = 1;
 
 		/// <summary>

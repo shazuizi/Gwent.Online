@@ -27,18 +27,24 @@ namespace Gwent.Core
 			{
 				HostPlayerBoard = new PlayerBoardState
 				{
-					PlayerNickname = sessionConfiguration.HostPlayer.Nickname
+					PlayerNickname = sessionConfiguration.HostPlayer.Nickname,
+					LifeTokensRemaining = 2,
+					RoundsWon = 0,
+					HasPassedCurrentRound = false
 				},
 				GuestPlayerBoard = new PlayerBoardState
 				{
-					PlayerNickname = sessionConfiguration.GuestPlayer.Nickname
+					PlayerNickname = sessionConfiguration.GuestPlayer.Nickname,
+					LifeTokensRemaining = 2,
+					RoundsWon = 0,
+					HasPassedCurrentRound = false
 				},
 				ActivePlayerNickname = sessionConfiguration.HostPlayer.Nickname,
 				CurrentRoundNumber = 1,
-				IsGameFinished = false
+				IsGameFinished = false,
+				WinnerNickname = null
 			};
 
-			// Na razie generujemy proste talie testowe – później można wczytać z plików / deck editora.
 			BoardState.HostPlayerBoard.Deck = CreateSimpleTestDeck(FactionType.NorthernRealms, BoardState.HostPlayerBoard.PlayerNickname);
 			BoardState.GuestPlayerBoard.Deck = CreateSimpleTestDeck(FactionType.Nilfgaard, BoardState.GuestPlayerBoard.PlayerNickname);
 
@@ -54,7 +60,6 @@ namespace Gwent.Core
 		/// </summary>
 		public GameBoardState GetCurrentBoardStateSnapshot()
 		{
-			// na razie zwracamy referencję; jeśli chcesz pełne kopie – można dodać głębokie klonowanie
 			return BoardState;
 		}
 
@@ -68,21 +73,24 @@ namespace Gwent.Core
 				return BoardState;
 			}
 
-			if (gameActionPayload.ActionType == GameActionType.PlayCard)
+			switch (gameActionPayload.ActionType)
 			{
-				ApplyPlayCardAction(gameActionPayload);
-			}
-			else if (gameActionPayload.ActionType == GameActionType.PassTurn)
-			{
-				ApplyPassTurnAction(gameActionPayload);
+				case GameActionType.PlayCard:
+					ApplyPlayCardAction(gameActionPayload);
+					break;
+
+				case GameActionType.PassTurn:
+					ApplyPassTurnAction(gameActionPayload);
+					break;
+
+				case GameActionType.Resign:
+					ApplyResignAction(gameActionPayload);
+					break;
 			}
 
 			return BoardState;
 		}
 
-		/// <summary>
-		/// Tworzy prostą przykładową talię testową (kilka kart na każdy rząd).
-		/// </summary>
 		private List<GwentCard> CreateSimpleTestDeck(FactionType faction, string ownerNickname)
 		{
 			var deck = new List<GwentCard>();
@@ -129,14 +137,11 @@ namespace Gwent.Core
 				});
 			}
 
-			// TODO: dodać karty pogody, Commander's Horn, Scorch itd.
+			// TODO: dodać realne karty pogody / specjalne.
 
 			return deck;
 		}
 
-		/// <summary>
-		/// Tasuje talię gracza.
-		/// </summary>
 		private void ShuffleDeck(List<GwentCard> deck)
 		{
 			for (int i = deck.Count - 1; i > 0; i--)
@@ -146,9 +151,6 @@ namespace Gwent.Core
 			}
 		}
 
-		/// <summary>
-		/// Dobiera określoną liczbę kart z talii do ręki (jeśli są dostępne).
-		/// </summary>
 		private void DrawStartingHand(PlayerBoardState playerBoardState, int cardsToDraw)
 		{
 			for (int i = 0; i < cardsToDraw && playerBoardState.Deck.Count > 0; i++)
@@ -159,9 +161,6 @@ namespace Gwent.Core
 			}
 		}
 
-		/// <summary>
-		/// Zwraca stan planszy gracza po jego nicku.
-		/// </summary>
 		private PlayerBoardState GetPlayerBoardByNickname(string playerNickname)
 		{
 			if (BoardState.HostPlayerBoard.PlayerNickname == playerNickname)
@@ -172,9 +171,6 @@ namespace Gwent.Core
 			return BoardState.GuestPlayerBoard;
 		}
 
-		/// <summary>
-		/// Zwraca stan planszy przeciwnika dla podanego nicku.
-		/// </summary>
 		private PlayerBoardState GetOpponentBoardByNickname(string playerNickname)
 		{
 			if (BoardState.HostPlayerBoard.PlayerNickname == playerNickname)
@@ -185,12 +181,15 @@ namespace Gwent.Core
 			return BoardState.HostPlayerBoard;
 		}
 
-		/// <summary>
-		/// Stosuje akcję zagrania karty – przenosi kartę z ręki na odpowiedni rząd.
-		/// </summary>
 		private void ApplyPlayCardAction(GameActionPayload gameActionPayload)
 		{
 			var actingPlayerBoard = GetPlayerBoardByNickname(gameActionPayload.ActingPlayerNickname);
+
+			if (actingPlayerBoard.HasPassedCurrentRound)
+			{
+				// Gracz, który już zapasował, nie może zagrywać kart.
+				return;
+			}
 
 			if (gameActionPayload.CardInstanceId == null)
 			{
@@ -232,13 +231,15 @@ namespace Gwent.Core
 			SwitchTurnToOpponent(actingPlayerBoard.PlayerNickname);
 		}
 
-		/// <summary>
-		/// Stosuje akcję "pass" – gracz rezygnuje z dalszego zagrywania w tej rundzie.
-		/// Gdy obaj zrobią pass, kończy rundę i przygotowuje następną lub kończy grę.
-		/// </summary>
 		private void ApplyPassTurnAction(GameActionPayload gameActionPayload)
 		{
 			var actingPlayerBoard = GetPlayerBoardByNickname(gameActionPayload.ActingPlayerNickname);
+
+			if (actingPlayerBoard.HasPassedCurrentRound)
+			{
+				return;
+			}
+
 			actingPlayerBoard.HasPassedCurrentRound = true;
 
 			var opponentBoard = GetOpponentBoardByNickname(gameActionPayload.ActingPlayerNickname);
@@ -253,40 +254,49 @@ namespace Gwent.Core
 			}
 		}
 
-		/// <summary>
-		/// Kończy aktualną rundę – przyznaje punkt zwycięzcy, czyści rzędy i przechodzi do kolejnej rundy
-		/// lub kończy grę, jeśli ktoś wygrał wymaganą liczbę rund.
-		/// </summary>
+		private void ApplyResignAction(GameActionPayload gameActionPayload)
+		{
+			var actingPlayerBoard = GetPlayerBoardByNickname(gameActionPayload.ActingPlayerNickname);
+			var opponentBoard = GetOpponentBoardByNickname(gameActionPayload.ActingPlayerNickname);
+
+			BoardState.IsGameFinished = true;
+			BoardState.WinnerNickname = opponentBoard.PlayerNickname;
+
+			actingPlayerBoard.LifeTokensRemaining = 0;
+		}
+
 		private void EndRound()
 		{
 			int hostStrength = BoardState.HostPlayerBoard.GetTotalStrength();
 			int guestStrength = BoardState.GuestPlayerBoard.GetTotalStrength();
 
+			PlayerBoardState? roundWinner = null;
+			PlayerBoardState? roundLoser = null;
+
 			if (hostStrength > guestStrength)
 			{
-				BoardState.HostPlayerBoard.RoundsWon++;
+				roundWinner = BoardState.HostPlayerBoard;
+				roundLoser = BoardState.GuestPlayerBoard;
 			}
 			else if (guestStrength > hostStrength)
 			{
-				BoardState.GuestPlayerBoard.RoundsWon++;
-			}
-			else
-			{
-				// Remis – brak punktu.
+				roundWinner = BoardState.GuestPlayerBoard;
+				roundLoser = BoardState.HostPlayerBoard;
 			}
 
-			// Sprawdzenie zakończenia gry – klasycznie: 2 wygrane rundy.
-			if (BoardState.HostPlayerBoard.RoundsWon >= 2 ||
-				BoardState.GuestPlayerBoard.RoundsWon >= 2)
+			if (roundWinner != null && roundLoser != null)
 			{
-				BoardState.IsGameFinished = true;
-				BoardState.WinnerNickname = BoardState.HostPlayerBoard.RoundsWon > BoardState.GuestPlayerBoard.RoundsWon
-					? BoardState.HostPlayerBoard.PlayerNickname
-					: BoardState.GuestPlayerBoard.PlayerNickname;
-				return;
+				roundWinner.RoundsWon++;
+				roundLoser.LifeTokensRemaining--;
+
+				if (roundLoser.LifeTokensRemaining <= 0)
+				{
+					BoardState.IsGameFinished = true;
+					BoardState.WinnerNickname = roundWinner.PlayerNickname;
+					return;
+				}
 			}
 
-			// Czyścimy rzędy, flagi pass, zwiększamy numer rundy.
 			ClearRows(BoardState.HostPlayerBoard);
 			ClearRows(BoardState.GuestPlayerBoard);
 
@@ -295,13 +305,9 @@ namespace Gwent.Core
 
 			BoardState.CurrentRoundNumber++;
 
-			// W następnej rundzie zaczyna zwycięzca poprzedniej (tu: prosty wariant – host zawsze zaczyna).
 			BoardState.ActivePlayerNickname = BoardState.HostPlayerBoard.PlayerNickname;
 		}
 
-		/// <summary>
-		/// Czyści wszystkie rzędy jednostek danego gracza (karty idą na cmentarz).
-		/// </summary>
 		private void ClearRows(PlayerBoardState playerBoardState)
 		{
 			MoveRowToGraveyard(playerBoardState, playerBoardState.MeleeRow);
@@ -309,9 +315,6 @@ namespace Gwent.Core
 			MoveRowToGraveyard(playerBoardState, playerBoardState.SiegeRow);
 		}
 
-		/// <summary>
-		/// Przenosi wszystkie karty z rzędu na cmentarz.
-		/// </summary>
 		private void MoveRowToGraveyard(PlayerBoardState playerBoardState, List<GwentCard> row)
 		{
 			foreach (var card in row)
@@ -321,9 +324,6 @@ namespace Gwent.Core
 			row.Clear();
 		}
 
-		/// <summary>
-		/// Zmienia kolej na przeciwnika.
-		/// </summary>
 		private void SwitchTurnToOpponent(string currentPlayerNickname)
 		{
 			var opponentBoard = GetOpponentBoardByNickname(currentPlayerNickname);
