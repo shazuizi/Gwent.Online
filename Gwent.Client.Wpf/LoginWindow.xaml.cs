@@ -61,6 +61,19 @@ namespace Gwent.Client.Wpf
 				// brak uprawnień itp. – nie zabijamy przez to aplikacji
 			}
 		}
+		private void BtnOk_Click(object sender, RoutedEventArgs e)
+		{
+			string nick = TxtNickname.Text;
+			string ip = TxtServerAddress.Text;
+			int port = int.Parse(TxtPort.Text);
+
+			// np. jeśli zaznaczone "Hostuj" → jesteś P1, jeśli "Dołącz" → P2
+			string playerId = RbHost.IsChecked == true ? "P1" : "P2";
+
+			var main = new MainWindow(playerId, nick, ip, port);
+			main.Show();
+			this.Close();
+		}
 
 		private async void Ok_Click(object sender, RoutedEventArgs e)
 		{
@@ -115,10 +128,10 @@ namespace Gwent.Client.Wpf
 
 			// Otwórz okno gry i przekaż ustawienia
 			var gameWindow = new MainWindow(
-				nickname: cfg.Nickname,
+				playerId: isHost ? "P1" : "P2",
+				myNick: cfg.Nickname,
 				serverAddress: serverAddress,
-				port: port,
-				isHost: isHost);
+				serverPort: port);
 
 			gameWindow.Show();
 			Close();
