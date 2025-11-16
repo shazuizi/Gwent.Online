@@ -19,6 +19,11 @@ namespace Gwent.Core
 		public List<GwentCard> SiegeRow { get; set; } = new List<GwentCard>();
 
 		/// <summary>
+		/// Karta dowódcy gracza (poza talią).
+		/// </summary>
+		public GwentCard? LeaderCard { get; set; }
+
+		/// <summary>
 		/// Czy gracz zapasował w bieżącej rundzie.
 		/// </summary>
 		public bool HasPassedCurrentRound { get; set; }
@@ -35,13 +40,27 @@ namespace Gwent.Core
 		public int LifeTokensRemaining { get; set; } = 2;
 
 		/// <summary>
-		/// Zwraca sumę siły na wszystkich rzędach (po aktualnych buffach/debuffach).
+		/// Suma siły na wszystkich rzędach.
 		/// </summary>
 		public int GetTotalStrength()
 		{
 			return MeleeRow.Sum(c => c.CurrentStrength) +
 				   RangedRow.Sum(c => c.CurrentStrength) +
 				   SiegeRow.Sum(c => c.CurrentStrength);
+		}
+
+		/// <summary>
+		/// Suma siły dla konkretnego rzędu.
+		/// </summary>
+		public int GetRowStrength(CardRow row)
+		{
+			return row switch
+			{
+				CardRow.Melee => MeleeRow.Sum(c => c.CurrentStrength),
+				CardRow.Ranged => RangedRow.Sum(c => c.CurrentStrength),
+				CardRow.Siege => SiegeRow.Sum(c => c.CurrentStrength),
+				_ => 0
+			};
 		}
 	}
 
@@ -52,6 +71,11 @@ namespace Gwent.Core
 	{
 		public PlayerBoardState HostPlayerBoard { get; set; } = new PlayerBoardState();
 		public PlayerBoardState GuestPlayerBoard { get; set; } = new PlayerBoardState();
+
+		/// <summary>
+		/// Karty pogody aktywne na stole (globalne).
+		/// </summary>
+		public List<GwentCard> WeatherCards { get; set; } = new List<GwentCard>();
 
 		/// <summary>
 		/// Nick aktualnie wykonującego ruch gracza.

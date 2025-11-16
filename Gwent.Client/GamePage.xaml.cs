@@ -8,6 +8,7 @@ namespace Gwent.Client
 {
 	/// <summary>
 	/// Główna strona rozgrywki – pokazuje stan planszy i pozwala grać karty / passować / poddać grę.
+	/// Wyświetla siłę każdego rzędu, lidera, talię, cmentarz i pogodę.
 	/// </summary>
 	public partial class GamePage : Page
 	{
@@ -101,7 +102,7 @@ namespace Gwent.Client
 
 		/// <summary>
 		/// Odświeża UI planszy na podstawie aktualnego stanu w GameClientController.
-		/// Pokazuje rundy, życia, pass, siłę itd.
+		/// Pokazuje rundy, życia, pass, siłę globalną i dla każdego rzędu, lidera, talię, cmentarz i pogodę.
 		/// </summary>
 		private void UpdateBoardUi()
 		{
@@ -112,10 +113,17 @@ namespace Gwent.Client
 			{
 				ClearAllListBoxes();
 				LocalPlayerStrengthTextBlock.Text = "Strength: 0";
-				OpponentStrengthTextBlock.Text = "Strength: 0";
+				OpponentPlayerStrengthTextBlock.Text = "Strength: 0";
 				RoundNumberTextBlock.Text = "Round -";
 				LocalLivesTextBlock.Text = "Lives: -";
 				OpponentLivesTextBlock.Text = "Lives: -";
+				LocalLeaderTextBlock.Text = "Leader: -";
+				OpponentLeaderTextBlock.Text = "Leader: -";
+				LocalDeckTextBlock.Text = "Deck: -";
+				OpponentDeckTextBlock.Text = "Deck: -";
+				LocalGraveyardTextBlock.Text = "Graveyard: -";
+				OpponentGraveyardTextBlock.Text = "Graveyard: -";
+				WeatherTextBlock.Text = "Weather: -";
 				LocalPassStatusTextBlock.Text = string.Empty;
 				OpponentPassStatusTextBlock.Text = string.Empty;
 				PlayCardButton.IsEnabled = false;
@@ -139,15 +147,50 @@ namespace Gwent.Client
 			}
 
 			RoundNumberTextBlock.Text = $"Round {boardState.CurrentRoundNumber}";
-			LocalPlayerStrengthTextBlock.Text = $"Strength: {localBoard.GetTotalStrength()}";
-			OpponentStrengthTextBlock.Text = $"Strength: {opponentBoard.GetTotalStrength()}";
 
+			// globalna siła
+			LocalPlayerStrengthTextBlock.Text = $"Strength: {localBoard.GetTotalStrength()}";
+			OpponentPlayerStrengthTextBlock.Text = $"Strength: {opponentBoard.GetTotalStrength()}";
+
+			// siły rzędów
+			LocalMeleeStrengthTextBlock.Text = localBoard.GetRowStrength(CardRow.Melee).ToString();
+			LocalRangedStrengthTextBlock.Text = localBoard.GetRowStrength(CardRow.Ranged).ToString();
+			LocalSiegeStrengthTextBlock.Text = localBoard.GetRowStrength(CardRow.Siege).ToString();
+
+			OpponentMeleeStrengthTextBlock.Text = opponentBoard.GetRowStrength(CardRow.Melee).ToString();
+			OpponentRangedStrengthTextBlock.Text = opponentBoard.GetRowStrength(CardRow.Ranged).ToString();
+			OpponentSiegeStrengthTextBlock.Text = opponentBoard.GetRowStrength(CardRow.Siege).ToString();
+
+			// życia
 			LocalLivesTextBlock.Text = $"Lives: {localBoard.LifeTokensRemaining}";
 			OpponentLivesTextBlock.Text = $"Lives: {opponentBoard.LifeTokensRemaining}";
 
+			// leader
+			LocalLeaderTextBlock.Text = $"Leader: {(localBoard.LeaderCard?.Name ?? "-")}";
+			OpponentLeaderTextBlock.Text = $"Leader: {(opponentBoard.LeaderCard?.Name ?? "-")}";
+
+			// deck / graveyard
+			LocalDeckTextBlock.Text = $"Deck: {localBoard.Deck.Count}";
+			OpponentDeckTextBlock.Text = $"Deck: {opponentBoard.Deck.Count}";
+			LocalGraveyardTextBlock.Text = $"Graveyard: {localBoard.Graveyard.Count}";
+			OpponentGraveyardTextBlock.Text = $"Graveyard: {opponentBoard.Graveyard.Count}";
+
+			// pass
 			LocalPassStatusTextBlock.Text = localBoard.HasPassedCurrentRound ? "Passed" : string.Empty;
 			OpponentPassStatusTextBlock.Text = opponentBoard.HasPassedCurrentRound ? "Passed" : string.Empty;
 
+			// pogoda
+			if (boardState.WeatherCards != null && boardState.WeatherCards.Any())
+			{
+				string weatherNames = string.Join(", ", boardState.WeatherCards.Select(c => c.Name));
+				WeatherTextBlock.Text = $"Weather: {weatherNames}";
+			}
+			else
+			{
+				WeatherTextBlock.Text = "Weather: none";
+			}
+
+			// karty na rzędach
 			LocalMeleeRowListBox.ItemsSource = localBoard.MeleeRow.Select(c => $"{c.Name} ({c.CurrentStrength})");
 			LocalRangedRowListBox.ItemsSource = localBoard.RangedRow.Select(c => $"{c.Name} ({c.CurrentStrength})");
 			LocalSiegeRowListBox.ItemsSource = localBoard.SiegeRow.Select(c => $"{c.Name} ({c.CurrentStrength})");
@@ -156,6 +199,7 @@ namespace Gwent.Client
 			OpponentRangedRowListBox.ItemsSource = opponentBoard.RangedRow.Select(c => $"{c.Name} ({c.CurrentStrength})");
 			OpponentSiegeRowListBox.ItemsSource = opponentBoard.SiegeRow.Select(c => $"{c.Name} ({c.CurrentStrength})");
 
+			// ręka
 			HandListBox.ItemsSource = localBoard.Hand;
 
 			bool isLocalTurn = boardState.ActivePlayerNickname == localBoard.PlayerNickname;
@@ -169,15 +213,9 @@ namespace Gwent.Client
 			{
 				gameResultAlreadyShown = true;
 
-				string message;
-				if (boardState.WinnerNickname == localBoard.PlayerNickname)
-				{
-					message = "You won the game!";
-				}
-				else
-				{
-					message = "You lost the game.";
-				}
+				string message = boardState.WinnerNickname == localBoard.PlayerNickname
+					? "You won the game!"
+					: "You lost the game.";
 
 				MessageBox.Show(message, "Game finished", MessageBoxButton.OK, MessageBoxImage.Information);
 

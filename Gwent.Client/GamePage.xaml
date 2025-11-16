@@ -9,7 +9,7 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Pasek z nickami, rolami, siłą, życiami i rundą -->
+        <!-- Pasek z nickami, rolami, siłą, życiami, leaderem, talią, cmentarzem i pogodą -->
         <Border Grid.Row="0" Padding="5" BorderThickness="0,0,0,1" BorderBrush="Gray">
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -18,34 +18,47 @@
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
+                <!-- Ty -->
                 <StackPanel Grid.Column="0" Orientation="Vertical">
                     <TextBlock Text="You" FontWeight="Bold"/>
                     <TextBlock x:Name="LocalPlayerNicknameTextBlock"/>
                     <TextBlock x:Name="LocalPlayerRoleTextBlock" FontSize="11" Foreground="Gray"/>
                     <TextBlock x:Name="LocalPlayerStrengthTextBlock" FontSize="14" FontWeight="Bold"/>
                     <TextBlock x:Name="LocalLivesTextBlock" FontSize="12"/>
+                    <TextBlock x:Name="LocalLeaderTextBlock" FontSize="12"/>
+                    <TextBlock x:Name="LocalDeckTextBlock" FontSize="11"/>
+                    <TextBlock x:Name="LocalGraveyardTextBlock" FontSize="11"/>
                     <TextBlock x:Name="LocalPassStatusTextBlock" FontSize="11" Foreground="DarkOrange"/>
                 </StackPanel>
 
+                <!-- Środek: runda + pogoda -->
                 <StackPanel Grid.Column="1" Orientation="Vertical" HorizontalAlignment="Center">
                     <TextBlock x:Name="RoundNumberTextBlock"
                                FontWeight="Bold"
                                FontSize="14"
                                HorizontalAlignment="Center"/>
+                    <TextBlock x:Name="WeatherTextBlock"
+                               FontSize="12"
+                               HorizontalAlignment="Center"
+                               Margin="0,4,0,0"/>
                 </StackPanel>
 
+                <!-- Przeciwnik -->
                 <StackPanel Grid.Column="2" Orientation="Vertical" HorizontalAlignment="Right">
                     <TextBlock Text="Opponent" FontWeight="Bold" HorizontalAlignment="Right"/>
                     <TextBlock x:Name="OpponentNicknameTextBlock" HorizontalAlignment="Right"/>
                     <TextBlock x:Name="OpponentRoleTextBlock" FontSize="11" Foreground="Gray" HorizontalAlignment="Right"/>
-                    <TextBlock x:Name="OpponentStrengthTextBlock" FontSize="14" FontWeight="Bold" HorizontalAlignment="Right"/>
+                    <TextBlock x:Name="OpponentPlayerStrengthTextBlock" FontSize="14" FontWeight="Bold" HorizontalAlignment="Right"/>
                     <TextBlock x:Name="OpponentLivesTextBlock" FontSize="12" HorizontalAlignment="Right"/>
+                    <TextBlock x:Name="OpponentLeaderTextBlock" FontSize="12" HorizontalAlignment="Right"/>
+                    <TextBlock x:Name="OpponentDeckTextBlock" FontSize="11" HorizontalAlignment="Right"/>
+                    <TextBlock x:Name="OpponentGraveyardTextBlock" FontSize="11" HorizontalAlignment="Right"/>
                     <TextBlock x:Name="OpponentPassStatusTextBlock" FontSize="11" Foreground="DarkOrange" HorizontalAlignment="Right"/>
                 </StackPanel>
             </Grid>
         </Border>
 
-        <!-- Plansza: rzędy graczy -->
+        <!-- Plansza: rzędy graczy z wynikiem każdego rzędu -->
         <Grid Grid.Row="1" Margin="0,10,0,10">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -63,13 +76,39 @@
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
-                <GroupBox Header="Melee" Grid.Row="0" Margin="0,0,0,5">
+                <GroupBox Grid.Row="0" Margin="0,0,0,5">
+                    <GroupBox.Header>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Melee"/>
+                            <TextBlock Text=" (" />
+                            <TextBlock x:Name="OpponentMeleeStrengthTextBlock"/>
+                            <TextBlock Text=")" />
+                        </StackPanel>
+                    </GroupBox.Header>
                     <ListBox x:Name="OpponentMeleeRowListBox" />
                 </GroupBox>
-                <GroupBox Header="Ranged" Grid.Row="1" Margin="0,0,0,5">
+
+                <GroupBox Grid.Row="1" Margin="0,0,0,5">
+                    <GroupBox.Header>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Ranged"/>
+                            <TextBlock Text=" (" />
+                            <TextBlock x:Name="OpponentRangedStrengthTextBlock"/>
+                            <TextBlock Text=")" />
+                        </StackPanel>
+                    </GroupBox.Header>
                     <ListBox x:Name="OpponentRangedRowListBox" />
                 </GroupBox>
-                <GroupBox Header="Siege" Grid.Row="2">
+
+                <GroupBox Grid.Row="2">
+                    <GroupBox.Header>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Siege"/>
+                            <TextBlock Text=" (" />
+                            <TextBlock x:Name="OpponentSiegeStrengthTextBlock"/>
+                            <TextBlock Text=")" />
+                        </StackPanel>
+                    </GroupBox.Header>
                     <ListBox x:Name="OpponentSiegeRowListBox" />
                 </GroupBox>
             </Grid>
@@ -83,13 +122,39 @@
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
-                <GroupBox Header="Melee" Grid.Row="0" Margin="0,0,0,5">
+                <GroupBox Grid.Row="0" Margin="0,0,0,5">
+                    <GroupBox.Header>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Melee"/>
+                            <TextBlock Text=" (" />
+                            <TextBlock x:Name="LocalMeleeStrengthTextBlock"/>
+                            <TextBlock Text=")" />
+                        </StackPanel>
+                    </GroupBox.Header>
                     <ListBox x:Name="LocalMeleeRowListBox" />
                 </GroupBox>
-                <GroupBox Header="Ranged" Grid.Row="1" Margin="0,0,0,5">
+
+                <GroupBox Grid.Row="1" Margin="0,0,0,5">
+                    <GroupBox.Header>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Ranged"/>
+                            <TextBlock Text=" (" />
+                            <TextBlock x:Name="LocalRangedStrengthTextBlock"/>
+                            <TextBlock Text=")" />
+                        </StackPanel>
+                    </GroupBox.Header>
                     <ListBox x:Name="LocalRangedRowListBox" />
                 </GroupBox>
-                <GroupBox Header="Siege" Grid.Row="2">
+
+                <GroupBox Grid.Row="2">
+                    <GroupBox.Header>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="Siege"/>
+                            <TextBlock Text=" (" />
+                            <TextBlock x:Name="LocalSiegeStrengthTextBlock"/>
+                            <TextBlock Text=")" />
+                        </StackPanel>
+                    </GroupBox.Header>
                     <ListBox x:Name="LocalSiegeRowListBox" />
                 </GroupBox>
             </Grid>
