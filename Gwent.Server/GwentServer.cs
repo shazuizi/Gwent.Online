@@ -12,6 +12,7 @@ namespace Gwent.Server
 	/// <summary>
 	/// Klasa odpowiedzialna za logikę serwera Gwinta:
 	/// nasłuchiwanie, przyjmowanie połączeń i start rozgrywki, gdy dwóch graczy jest połączonych i gotowych.
+	/// Dodatkowo trzyma GameEngine i przetwarza akcje graczy.
 	/// </summary>
 	public class GwentServer : IDisposable
 	{
@@ -25,15 +26,14 @@ namespace Gwent.Server
 		private bool isHostPlayerReady;
 		private bool isGuestPlayerReady;
 
+		private GameEngine? gameEngine;
+
 		public GwentServer(ServerConfiguration serverConfiguration)
 		{
 			this.serverConfiguration = serverConfiguration;
 			tcpListener = new TcpListener(IPAddress.Any, serverConfiguration.ListeningPort);
 		}
 
-		/// <summary>
-		/// Uruchamia serwer: startuje nasłuch TCP oraz pętlę akceptowania nowych klientów.
-		/// </summary>
 		public async Task StartAsync()
 		{
 			tcpListener.Start();
@@ -56,7 +56,7 @@ namespace Gwent.Server
 			}
 			catch (OperationCanceledException)
 			{
-				// Normalne wyjście z pętli przy zatrzymaniu serwera.
+				// Normalne wyjście z pętli.
 			}
 			finally
 			{
@@ -64,15 +64,10 @@ namespace Gwent.Server
 			}
 		}
 
-		/// <summary>
-		/// Obsługuje pojedynczego klienta: odbiera wiadomości, reaguje na żądania dołączenia i gotowości.
-		/// Wiadomości są w formacie JSON zakończonym '\n'.
-		/// </summary>
 		private async Task HandleClientAsync(TcpClient client, CancellationToken cancellationToken)
 		{
 			if (connectedClients.Count >= 2)
 			{
-				// Serwer zapełniony – można by tu odesłać info, ale na razie od razu rozłączamy.
 				client.Close();
 				return;
 			}
@@ -91,7 +86,6 @@ namespace Gwent.Server
 					int bytesRead = await clientNetworkStream.ReadAsync(readBuffer, 0, readBuffer.Length, cancellationToken);
 					if (bytesRead <= 0)
 					{
-						// Klient się odłączył
 						break;
 					}
 
@@ -140,7 +134,7 @@ namespace Gwent.Server
 			}
 			catch (OperationCanceledException)
 			{
-				// Normalne wyjście z pętli przy zatrzymaniu serwera.
+				// zignoruj
 			}
 			catch (Exception ex)
 			{
@@ -154,9 +148,6 @@ namespace Gwent.Server
 			}
 		}
 
-		/// <summary>
-		/// Przetwarza pojedynczą wiadomość sieciową otrzymaną od klienta.
-		/// </summary>
 		private async Task HandleNetworkMessageAsync(
 			TcpClient client,
 			NetworkStream clientNetworkStream,
@@ -173,16 +164,15 @@ namespace Gwent.Server
 					await HandlePlayerReadyAsync(networkMessage, cancellationToken);
 					break;
 
+				case NetworkMessageType.GameAction:
+					await HandleGameActionAsync(networkMessage, cancellationToken);
+					break;
+
 				default:
-					// TODO: obsługa innych typów wiadomości w przyszłości.
 					break;
 			}
 		}
 
-		/// <summary>
-		/// Obsługuje żądanie dołączenia gracza – zapisuje gracza jako Host lub Guest
-		/// oraz wysyła akceptację wraz z aktualną konfiguracją sesji oraz przypisaną rolą.
-		/// </summary>
 		private async Task HandlePlayerJoinRequestAsync(
 			TcpClient client,
 			NetworkStream clientNetworkStream,
@@ -197,7 +187,6 @@ namespace Gwent.Server
 
 			GameRole assignedRole;
 
-			// Jeżeli HostPlayer nie ma jeszcze nicka – pierwszy dołączający zostaje Hostem.
 			if (string.IsNullOrWhiteSpace(currentGameSessionConfiguration.HostPlayer.Nickname))
 			{
 				currentGameSessionConfiguration.HostPlayer = joinPayload.JoiningPlayer;
@@ -222,11 +211,6 @@ namespace Gwent.Server
 			Console.WriteLine($"Player joined as {assignedRole}: {joinPayload.JoiningPlayer.Nickname}");
 		}
 
-		/// <summary>
-		/// Obsługuje informację o gotowości gracza. 
-		/// Gdy Host i Guest są gotowi – wysyła do wszystkich komunikat startu gry
-		/// wraz z pełną konfiguracją sesji.
-		/// </summary>
 		private async Task HandlePlayerReadyAsync(
 			NetworkMessage networkMessage,
 			CancellationToken cancellationToken)
@@ -250,6 +234,11 @@ namespace Gwent.Server
 
 			if (isHostPlayerReady && isGuestPlayerReady && connectedClients.Count == 2)
 			{
+				// Inicjujemy engine gry
+				gameEngine = new GameEngine();
+				gameEngine.InitializeNewGame(currentGameSessionConfiguration);
+
+				// wysyłamy komunikat startu gry
 				GameStartPayload startPayload = new GameStartPayload
 				{
 					GameSessionConfiguration = currentGameSessionConfiguration
@@ -259,22 +248,70 @@ namespace Gwent.Server
 					NetworkMessageType.BothPlayersReadyStartGame,
 					startPayload);
 
-				foreach (TcpClient connectedClient in connectedClients)
-				{
-					if (connectedClient.Connected)
-					{
-						NetworkStream networkStream = connectedClient.GetStream();
-						await SendMessageToClientAsync(networkStream, startGameMessage, cancellationToken);
-					}
-				}
+				await BroadcastMessageAsync(startGameMessage, cancellationToken);
 
-				Console.WriteLine("Both players are ready. Start game message sent.");
+				// oraz pierwszy snapshot stanu planszy
+				await BroadcastCurrentGameStateAsync(cancellationToken);
+
+				Console.WriteLine("Both players are ready. Start game message + initial state sent.");
 			}
 		}
 
-		/// <summary>
-		/// Wysyła pojedynczą wiadomość do klienta po TCP jako JSON zakończony '\n'.
-		/// </summary>
+		private async Task HandleGameActionAsync(
+			NetworkMessage networkMessage,
+			CancellationToken cancellationToken)
+		{
+			if (gameEngine == null)
+			{
+				return;
+			}
+
+			GameActionPayload? actionPayload = networkMessage.DeserializePayload<GameActionPayload>();
+			if (actionPayload == null)
+			{
+				return;
+			}
+
+			// stosujemy akcję
+			gameEngine.ApplyGameAction(actionPayload);
+
+			// wysyłamy aktualny stan do wszystkich
+			await BroadcastCurrentGameStateAsync(cancellationToken);
+		}
+
+		private async Task BroadcastCurrentGameStateAsync(CancellationToken cancellationToken)
+		{
+			if (gameEngine == null)
+			{
+				return;
+			}
+
+			GameStateUpdatePayload updatePayload = new GameStateUpdatePayload
+			{
+				BoardState = gameEngine.GetCurrentBoardStateSnapshot()
+			};
+
+			NetworkMessage updateMessage = NetworkMessage.Create(
+				NetworkMessageType.GameStateUpdate,
+				updatePayload);
+
+			await BroadcastMessageAsync(updateMessage, cancellationToken);
+		}
+
+		private async Task BroadcastMessageAsync(NetworkMessage message, CancellationToken cancellationToken)
+		{
+			foreach (TcpClient connectedClient in connectedClients)
+			{
+				if (!connectedClient.Connected)
+				{
+					continue;
+				}
+
+				NetworkStream stream = connectedClient.GetStream();
+				await SendMessageToClientAsync(stream, message, cancellationToken);
+			}
+		}
+
 		private async Task SendMessageToClientAsync(
 			NetworkStream clientNetworkStream,
 			NetworkMessage message,
@@ -285,9 +322,6 @@ namespace Gwent.Server
 			await clientNetworkStream.WriteAsync(data, 0, data.Length, cancellationToken);
 		}
 
-		/// <summary>
-		/// Zatrzymuje serwer – zakańcza pętlę nasłuchiwania i rozłącza klientów.
-		/// </summary>
 		public void Stop()
 		{
 			cancellationTokenSource.Cancel();
@@ -300,9 +334,6 @@ namespace Gwent.Server
 			connectedClients.Clear();
 		}
 
-		/// <summary>
-		/// Zwalnia zasoby serwera.
-		/// </summary>
 		public void Dispose()
 		{
 			Stop();

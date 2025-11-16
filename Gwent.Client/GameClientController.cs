@@ -8,8 +8,9 @@ namespace Gwent.Client
 	/// <summary>
 	/// Spina logikę klienta:
 	/// - zarządza połączeniem z serwerem,
-	/// - wysyła żądanie dołączenia i gotowości,
-	/// - przechowuje konfigurację sesji gry i rolę gracza,
+	/// - wysyła żądanie dołączenia / gotowości,
+	/// - wysyła akcje w grze,
+	/// - przechowuje konfigurację sesji, stan planszy i role gracza,
 	/// - reaguje na start gry i rozłączenie z serwerem.
 	/// </summary>
 	public class GameClientController : IDisposable
@@ -20,38 +21,22 @@ namespace Gwent.Client
 		private readonly PlayerIdentity localPlayerIdentity;
 
 		private readonly NetworkClientService networkClientService;
-
 		private Process? serverProcess;
 
-		/// <summary>
-		/// Bieżąca konfiguracja sesji gry otrzymana z serwera.
-		/// </summary>
 		public GameSessionConfiguration? CurrentGameSessionConfiguration { get; private set; }
+		public GameBoardState? CurrentBoardState { get; private set; }
 
-		/// <summary>
-		/// Rzeczywista rola przydzielona przez serwer (Host / Guest).
-		/// </summary>
 		public GameRole LocalPlayerRole { get; private set; }
-
-		/// <summary>
-		/// Rola, którą wybrał użytkownik w menu (Host / Guest).
-		/// </summary>
 		public GameRole RequestedGameRole => gameRoleRequestedByUser;
 
-		/// <summary>
-		/// Zdarzenie wywoływane, gdy konfiguracja sesji została zaktualizowana.
-		/// </summary>
 		public event EventHandler? GameSessionUpdated;
-
-		/// <summary>
-		/// Zdarzenie wywoływane, gdy serwer nakazuje rozpocząć rozgrywkę.
-		/// </summary>
 		public event EventHandler? GameShouldStart;
+		public event EventHandler? ServerDisconnected;
 
 		/// <summary>
-		/// Zdarzenie wywoływane, gdy połączenie z serwerem zostało utracone.
+		/// Wywoływane, gdy serwer przysłał nowy stan planszy.
 		/// </summary>
-		public event EventHandler? ServerDisconnected;
+		public event EventHandler? GameStateUpdated;
 
 		public GameClientController(
 			GameRole gameRole,
@@ -64,23 +49,17 @@ namespace Gwent.Client
 			this.serverPort = serverPort;
 			this.localPlayerIdentity = localPlayerIdentity;
 
-			LocalPlayerRole = gameRole; // zostanie nadpisane po PlayerJoinAccepted.
+			LocalPlayerRole = gameRole;
 
 			networkClientService = new NetworkClientService();
 			networkClientService.NetworkMessageReceived += OnNetworkMessageReceived;
 			networkClientService.Disconnected += OnDisconnectedFromServer;
 		}
 
-		/// <summary>
-		/// Nawiązuje połączenie z serwerem i wysyła żądanie dołączenia.
-		/// Dla zwiększenia niezawodności wykonuje kilka prób połączenia z krótkim opóźnieniem
-		/// (np. gdy host uruchamia lokalny serwer, który jeszcze nie zdążył zacząć nasłuchiwać).
-		/// </summary>
-		/// <returns>True, jeśli połączenie i wysłanie żądania dołączenia się powiodło; w przeciwnym razie false.</returns>
 		public async Task<bool> ConnectAndJoinAsync()
 		{
-			const int maxConnectionAttempts = 20;      // 20 prób
-			const int delayBetweenAttemptsMs = 250;    // co 250 ms => ~5 sekund łącznie
+			const int maxConnectionAttempts = 20;
+			const int delayBetweenAttemptsMs = 250;
 
 			bool isConnected = false;
 
@@ -94,7 +73,6 @@ namespace Gwent.Client
 				}
 
 				Debug.WriteLine($"[GameClientController] Connect attempt {attemptIndex} failed. Retrying...");
-
 				await Task.Delay(delayBetweenAttemptsMs);
 			}
 
@@ -117,9 +95,6 @@ namespace Gwent.Client
 			return true;
 		}
 
-		/// <summary>
-		/// Obsługuje przychodzące wiadomości z serwera i reaguje na zmiany sesji oraz start gry.
-		/// </summary>
 		private void OnNetworkMessageReceived(object? sender, NetworkMessage networkMessage)
 		{
 			switch (networkMessage.MessageType)
@@ -132,15 +107,15 @@ namespace Gwent.Client
 					HandleGameStart(networkMessage);
 					break;
 
+				case NetworkMessageType.GameStateUpdate:
+					HandleGameStateUpdate(networkMessage);
+					break;
+
 				default:
-					// TODO: logika innych typów wiadomości.
 					break;
 			}
 		}
 
-		/// <summary>
-		/// Przetwarza komunikat o akceptacji dołączenia – zapisuje konfigurację sesji oraz rolę gracza.
-		/// </summary>
 		private void HandlePlayerJoinAccepted(NetworkMessage networkMessage)
 		{
 			PlayerJoinAcceptedPayload? payload = networkMessage.DeserializePayload<PlayerJoinAcceptedPayload>();
@@ -155,10 +130,6 @@ namespace Gwent.Client
 			GameSessionUpdated?.Invoke(this, EventArgs.Empty);
 		}
 
-		/// <summary>
-		/// Przetwarza komunikat o starcie gry – aktualizuje konfigurację sesji (jeśli przysłana)
-		/// i wywołuje zdarzenie GameShouldStart.
-		/// </summary>
 		private void HandleGameStart(NetworkMessage networkMessage)
 		{
 			GameStartPayload? startPayload = networkMessage.DeserializePayload<GameStartPayload>();
@@ -171,17 +142,23 @@ namespace Gwent.Client
 			GameShouldStart?.Invoke(this, EventArgs.Empty);
 		}
 
-		/// <summary>
-		/// Reaguje na utratę połączenia z serwerem – przekazuje informację dalej przez zdarzenie ServerDisconnected.
-		/// </summary>
+		private void HandleGameStateUpdate(NetworkMessage networkMessage)
+		{
+			GameStateUpdatePayload? updatePayload = networkMessage.DeserializePayload<GameStateUpdatePayload>();
+			if (updatePayload == null)
+			{
+				return;
+			}
+
+			CurrentBoardState = updatePayload.BoardState;
+			GameStateUpdated?.Invoke(this, EventArgs.Empty);
+		}
+
 		private void OnDisconnectedFromServer(object? sender, EventArgs e)
 		{
 			ServerDisconnected?.Invoke(this, EventArgs.Empty);
 		}
 
-		/// <summary>
-		/// Wysyła do serwera wiadomość, że lokalny gracz jest gotowy do rozpoczęcia gry.
-		/// </summary>
 		public async Task SendPlayerReadyAsync()
 		{
 			PlayerReadyPayload readyPayload = new PlayerReadyPayload
@@ -197,16 +174,22 @@ namespace Gwent.Client
 		}
 
 		/// <summary>
-		/// Ustawia referencję do procesu serwera (jeżeli był uruchomiony przez hosta).
+		/// Wysyła na serwer akcję w grze (zagranie karty, pass).
 		/// </summary>
+		public async Task SendGameActionAsync(GameActionPayload gameActionPayload)
+		{
+			NetworkMessage networkMessage = NetworkMessage.Create(
+				NetworkMessageType.GameAction,
+				gameActionPayload);
+
+			await networkClientService.SendMessageAsync(networkMessage);
+		}
+
 		public void SetServerProcess(Process process)
 		{
 			serverProcess = process;
 		}
 
-		/// <summary>
-		/// Próbuje bezpiecznie zakończyć proces serwera, jeżeli jeszcze działa.
-		/// </summary>
 		public void TryStopServerProcess()
 		{
 			if (serverProcess != null && !serverProcess.HasExited)
@@ -217,14 +200,10 @@ namespace Gwent.Client
 				}
 				catch
 				{
-					// Ignorujemy problemy z zabiciem procesu.
 				}
 			}
 		}
 
-		/// <summary>
-		/// Zwalnia zasoby kontrolera klienta (połączenie sieciowe i proces serwera).
-		/// </summary>
 		public void Dispose()
 		{
 			networkClientService.Dispose();
