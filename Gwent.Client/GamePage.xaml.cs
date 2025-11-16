@@ -85,6 +85,8 @@ namespace Gwent.Client
 				OpponentNicknameTextBlock.Text = "Unknown";
 				LocalPlayerRoleTextBlock.Text = string.Empty;
 				OpponentRoleTextBlock.Text = string.Empty;
+				LocalFactionTextBlock.Text = string.Empty;
+				OpponentFactionTextBlock.Text = string.Empty;
 				return;
 			}
 
@@ -93,12 +95,18 @@ namespace Gwent.Client
 			string localRoleText;
 			string opponentRoleText;
 
+			FactionType localFaction;
+			FactionType opponentFaction;
+
 			if (gameClientController.LocalPlayerRole == GameRole.Host)
 			{
 				localNickname = sessionConfiguration.HostPlayer.Nickname;
 				opponentNickname = sessionConfiguration.GuestPlayer.Nickname;
 				localRoleText = "Role: Host";
 				opponentRoleText = "Role: Guest";
+
+				localFaction = sessionConfiguration.HostPlayer.Faction;
+				opponentFaction = sessionConfiguration.GuestPlayer.Faction;
 			}
 			else
 			{
@@ -106,6 +114,9 @@ namespace Gwent.Client
 				opponentNickname = sessionConfiguration.HostPlayer.Nickname;
 				localRoleText = "Role: Guest";
 				opponentRoleText = "Role: Host";
+
+				localFaction = sessionConfiguration.GuestPlayer.Faction;
+				opponentFaction = sessionConfiguration.HostPlayer.Faction;
 			}
 
 			if (string.IsNullOrWhiteSpace(localNickname))
@@ -118,7 +129,11 @@ namespace Gwent.Client
 			OpponentNicknameTextBlock.Text = opponentNickname;
 			LocalPlayerRoleTextBlock.Text = localRoleText;
 			OpponentRoleTextBlock.Text = opponentRoleText;
+
+			LocalFactionTextBlock.Text = $"Faction: {FormatFactionName(localFaction)}";
+			OpponentFactionTextBlock.Text = $"Faction: {FormatFactionName(opponentFaction)}";
 		}
+
 
 		private void UpdateBoardUi()
 		{
@@ -838,5 +853,19 @@ namespace Gwent.Client
 		}
 
 		#endregion
+
+		private string FormatFactionName(FactionType faction)
+		{
+			return faction switch
+			{
+				FactionType.Neutral => "Neutral",
+				FactionType.NorthernRealms => "Northern Realms",
+				FactionType.Nilfgaard => "Nilfgaard Empire",
+				FactionType.Scoiatael => "Scoia'tael",
+				FactionType.Monsters => "Monsters",
+				_ => faction.ToString()
+			};
+		}
+
 	}
 }

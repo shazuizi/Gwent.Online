@@ -23,6 +23,7 @@
                 <StackPanel Grid.Column="0" Orientation="Vertical">
                     <TextBlock Text="You" FontWeight="Bold"/>
                     <TextBlock x:Name="LocalPlayerNicknameTextBlock"/>
+                    <TextBlock x:Name="LocalFactionTextBlock" FontSize="11" Foreground="DarkSlateGray"/>
                     <TextBlock x:Name="LocalPlayerRoleTextBlock" FontSize="11" Foreground="Gray"/>
                     <TextBlock x:Name="LocalPlayerStrengthTextBlock" FontSize="14" FontWeight="Bold"/>
                     <TextBlock x:Name="LocalLivesTextBlock" FontSize="12"/>
@@ -53,6 +54,7 @@
                 <StackPanel Grid.Column="2" Orientation="Vertical" HorizontalAlignment="Right">
                     <TextBlock Text="Opponent" FontWeight="Bold" HorizontalAlignment="Right"/>
                     <TextBlock x:Name="OpponentNicknameTextBlock" HorizontalAlignment="Right"/>
+                    <TextBlock x:Name="OpponentFactionTextBlock" FontSize="11" Foreground="DarkSlateGray" HorizontalAlignment="Right"/>
                     <TextBlock x:Name="OpponentRoleTextBlock" FontSize="11" Foreground="Gray" HorizontalAlignment="Right"/>
                     <TextBlock x:Name="OpponentPlayerStrengthTextBlock" FontSize="14" FontWeight="Bold" HorizontalAlignment="Right"/>
                     <TextBlock x:Name="OpponentLivesTextBlock" FontSize="12" HorizontalAlignment="Right"/>
