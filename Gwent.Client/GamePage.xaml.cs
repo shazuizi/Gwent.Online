@@ -1,10 +1,7 @@
-﻿using System;
-using System.Linq;
-using System.Threading.Tasks;
+﻿using Gwent.Core;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using Gwent.Core;
 
 namespace Gwent.Client
 {
@@ -72,7 +69,7 @@ namespace Gwent.Client
 			});
 		}
 
-		#endregion
+		#endregion Eventy z kontrolera klienta
 
 		#region UI – nicki, plansza, itp.
 
@@ -85,6 +82,8 @@ namespace Gwent.Client
 				OpponentNicknameTextBlock.Text = "Unknown";
 				LocalPlayerRoleTextBlock.Text = string.Empty;
 				OpponentRoleTextBlock.Text = string.Empty;
+				LocalFactionTextBlock.Text = string.Empty;
+				OpponentFactionTextBlock.Text = string.Empty;
 				return;
 			}
 
@@ -93,12 +92,18 @@ namespace Gwent.Client
 			string localRoleText;
 			string opponentRoleText;
 
+			FactionType localFaction;
+			FactionType opponentFaction;
+
 			if (gameClientController.LocalPlayerRole == GameRole.Host)
 			{
 				localNickname = sessionConfiguration.HostPlayer.Nickname;
 				opponentNickname = sessionConfiguration.GuestPlayer.Nickname;
 				localRoleText = "Role: Host";
 				opponentRoleText = "Role: Guest";
+
+				localFaction = sessionConfiguration.HostPlayer.Faction;
+				opponentFaction = sessionConfiguration.GuestPlayer.Faction;
 			}
 			else
 			{
@@ -106,6 +111,9 @@ namespace Gwent.Client
 				opponentNickname = sessionConfiguration.HostPlayer.Nickname;
 				localRoleText = "Role: Guest";
 				opponentRoleText = "Role: Host";
+
+				localFaction = sessionConfiguration.GuestPlayer.Faction;
+				opponentFaction = sessionConfiguration.HostPlayer.Faction;
 			}
 
 			if (string.IsNullOrWhiteSpace(localNickname))
@@ -118,6 +126,9 @@ namespace Gwent.Client
 			OpponentNicknameTextBlock.Text = opponentNickname;
 			LocalPlayerRoleTextBlock.Text = localRoleText;
 			OpponentRoleTextBlock.Text = opponentRoleText;
+
+			LocalFactionTextBlock.Text = $"Faction: {FormatFactionName(localFaction)}";
+			OpponentFactionTextBlock.Text = $"Faction: {FormatFactionName(opponentFaction)}";
 		}
 
 		private void UpdateBoardUi()
@@ -309,7 +320,7 @@ namespace Gwent.Client
 			HandListBox.ItemsSource = null;
 		}
 
-		#endregion
+		#endregion UI – nicki, plansza, itp.
 
 		#region Panel szczegółów karty
 
@@ -342,7 +353,7 @@ namespace Gwent.Client
 			}
 		}
 
-		#endregion
+		#endregion Panel szczegółów karty
 
 		#region Hand – wybór karty
 
@@ -357,7 +368,7 @@ namespace Gwent.Client
 			pendingMedicRow = null;
 		}
 
-		#endregion
+		#endregion Hand – wybór karty
 
 		#region Klikanie w rzędy (GroupBoxy)
 
@@ -401,7 +412,7 @@ namespace Gwent.Client
 			await PlayHandCardOnRowAsync(selectedHandCard, row, isOpponentRow: true);
 		}
 
-		#endregion
+		#endregion Klikanie w rzędy (GroupBoxy)
 
 		#region ListBoxy rzędów – tylko targety (Decoy/Mardroeme) + czyszczenie zaznaczenia
 
@@ -455,7 +466,7 @@ namespace Gwent.Client
 			listBox.SelectedItem = null;
 		}
 
-		#endregion
+		#endregion ListBoxy rzędów – tylko targety (Decoy/Mardroeme) + czyszczenie zaznaczenia
 
 		#region Cmentarz – Medic
 
@@ -494,7 +505,7 @@ namespace Gwent.Client
 			await gameClientController.SendGameActionAsync(actionPayload);
 		}
 
-		#endregion
+		#endregion Cmentarz – Medic
 
 		#region Zagrywanie karty z ręki na rząd / globalnie
 
@@ -634,7 +645,7 @@ namespace Gwent.Client
 			await gameClientController.SendGameActionAsync(actionPayload);
 		}
 
-		#endregion
+		#endregion Zagrywanie karty z ręki na rząd / globalnie
 
 		#region Przyciski: Play (globalne karty), Mulligan, Leader, Pass, Surrender
 
@@ -837,6 +848,19 @@ namespace Gwent.Client
 			await gameClientController.SendGameActionAsync(actionPayload);
 		}
 
-		#endregion
+		#endregion Przyciski: Play (globalne karty), Mulligan, Leader, Pass, Surrender
+
+		private string FormatFactionName(FactionType faction)
+		{
+			return faction switch
+			{
+				FactionType.Neutral => "Neutral",
+				FactionType.NorthernRealms => "Northern Realms",
+				FactionType.Nilfgaard => "Nilfgaard Empire",
+				FactionType.Scoiatael => "Scoia'tael",
+				FactionType.Monsters => "Monsters",
+				_ => faction.ToString()
+			};
+		}
 	}
 }

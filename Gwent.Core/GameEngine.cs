@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-
-namespace Gwent.Core
+﻿namespace Gwent.Core
 {
 	public class GameEngine
 	{
@@ -336,7 +332,7 @@ namespace Gwent.Core
 			return BoardState.HostPlayerBoard;
 		}
 
-		#endregion
+		#endregion Init / helpers
 
 		#region LogEntry
 
@@ -356,7 +352,7 @@ namespace Gwent.Core
 			}
 		}
 
-		#endregion
+		#endregion LogEntry
 
 		#region Mulligan
 
@@ -394,8 +390,7 @@ namespace Gwent.Core
 			AddLogEntry($"{player.PlayerNickname} mulliganed {card.Name}.");
 		}
 
-
-		#endregion
+		#endregion Mulligan
 
 		#region Play card + targeted abilities
 
@@ -616,7 +611,7 @@ namespace Gwent.Core
 			player.Graveyard.Add(mardroemeCard);
 		}
 
-		#endregion
+		#endregion Play card + targeted abilities
 
 		#region Pass / Resign / Leader
 
@@ -706,6 +701,7 @@ namespace Gwent.Core
 			PlayerBoardState? roundLoser = null;
 			bool isTrueDraw = false;
 
+			// 1) Ustalamy zwycięzcę rundy na podstawie siły
 			if (hostStrength > guestStrength)
 			{
 				roundWinner = host;
@@ -718,79 +714,92 @@ namespace Gwent.Core
 			}
 			else
 			{
-				// remis siły – najpierw bonus Nilfgaardu
-				if (host.Faction == FactionType.Nilfgaard && guest.Faction != FactionType.Nilfgaard)
+				// 2) Remis siły – sprawdzamy bonus Nilfgaardu
+				bool hostIsNg = host.Faction == FactionType.Nilfgaard;
+				bool guestIsNg = guest.Faction == FactionType.Nilfgaard;
+
+				if (hostIsNg && !guestIsNg)
 				{
+					// host = Nilfgaard → wygrywa remis
 					roundWinner = host;
 					roundLoser = guest;
 				}
-				else if (guest.Faction == FactionType.Nilfgaard && host.Faction != FactionType.Nilfgaard)
+				else if (guestIsNg && !hostIsNg)
 				{
+					// guest = Nilfgaard → wygrywa remis
 					roundWinner = guest;
 					roundLoser = host;
 				}
 				else
 				{
-					// prawdziwy remis – żadna strona nie ma bonusu
+					// 3) Prawdziwy remis – żadna strona (albo obie) nie ma przewagi Nilfgaardu
 					isTrueDraw = true;
 				}
 			}
 
+			// 4) Obsługa prawdziwego remisu rundy (bez Nilfgaardu)
 			if (isTrueDraw)
 			{
-				// OBIE strony tracą 1 życie
+				// Obie strony „przegrywają” po 1 życiu
 				host.LifeTokensRemaining--;
 				guest.LifeTokensRemaining--;
 
-				// (opcjonalnie możesz zwiększać RoundsWon dla statystyk)
 				host.RoundsWon++;
 				guest.RoundsWon++;
 
-				AddLogEntry($"Round {BoardState.CurrentRoundNumber} ended in a draw. Host: {hostStrength}, Guest: {guestStrength}.");
+				AddLogEntry($"Round {BoardState.CurrentRoundNumber} ended in a draw. " +
+							$"Host: {hostStrength}, Guest: {guestStrength}. " +
+							$"Lives after draw – Host: {host.LifeTokensRemaining}, Guest: {guest.LifeTokensRemaining}.");
 
-				// sprawdzamy wynik gry po takim remisie
+				// 4a) Obaj mają 0 → remis całej gry
 				if (host.LifeTokensRemaining <= 0 && guest.LifeTokensRemaining <= 0)
 				{
-					// remis całej gry
 					BoardState.IsGameFinished = true;
 					BoardState.WinnerNickname = null;
-
-					AddLogEntry($"Game ended in a draw.");
+					AddLogEntry("Game ended in a full draw (both players lost their last life).");
 				}
+				// 4b) Host padł, Guest żyje → Guest wygrywa
 				else if (host.LifeTokensRemaining <= 0 && guest.LifeTokensRemaining > 0)
 				{
 					BoardState.IsGameFinished = true;
 					BoardState.WinnerNickname = guest.PlayerNickname;
-					AddLogEntry($"Game ended, {guest.PlayerNickname} won.");
+					AddLogEntry($"Game won by {guest.PlayerNickname} (host lost last life in draw round).");
 				}
+				// 4c) Guest padł, Host żyje → Host wygrywa
 				else if (guest.LifeTokensRemaining <= 0 && host.LifeTokensRemaining > 0)
 				{
 					BoardState.IsGameFinished = true;
 					BoardState.WinnerNickname = host.PlayerNickname;
-					AddLogEntry($"Game ended, {host.PlayerNickname} won.");
+					AddLogEntry($"Game won by {host.PlayerNickname} (guest lost last life in draw round).");
 				}
 			}
+			// 5) Normalna sytuacja – ktoś wygrał rundę
 			else if (roundWinner != null && roundLoser != null)
 			{
 				roundWinner.RoundsWon++;
 				roundLoser.LifeTokensRemaining--;
 
 				AddLogEntry($"Round {BoardState.CurrentRoundNumber} won by {roundWinner.PlayerNickname}. " +
-				$"Host: {hostStrength}, Guest: {guestStrength}.");
-				// Northern Realms – bonus za WYGRANĄ rundę
+							$"Host: {hostStrength}, Guest: {guestStrength}. " +
+							$"Loser lives left: {roundLoser.LifeTokensRemaining}.");
+
+				// Northern Realms bonus – po WYGRANEJ rundzie dobiera kartę
 				if (roundWinner.Faction == FactionType.NorthernRealms)
 				{
 					DrawFromDeck(roundWinner, 1);
+					AddLogEntry($"{roundWinner.PlayerNickname} draws a card due to Northern Realms bonus.");
 				}
 
+				// czy przegrany stracił ostatnie życie?
 				if (roundLoser.LifeTokensRemaining <= 0)
 				{
 					BoardState.IsGameFinished = true;
 					BoardState.WinnerNickname = roundWinner.PlayerNickname;
+					AddLogEntry($"Game won by {roundWinner.PlayerNickname} (opponent lost last life).");
 				}
 			}
 
-			// standardowe czyszczenie rundy
+			// 6) Koniec rundy – czyścimy rzędy, pogodę, passy, zwiększamy nr rundy
 			ClearRows(host);
 			ClearRows(guest);
 
@@ -800,16 +809,14 @@ namespace Gwent.Core
 			BoardState.WeatherCards.Clear();
 			BoardState.CurrentRoundNumber++;
 
+			// Nowa runda – jeśli gra jeszcze trwa, zaczyna host (prosto)
 			if (!BoardState.IsGameFinished)
 			{
-				// prosto: nową rundę zaczyna host
 				BoardState.ActivePlayerNickname = host.PlayerNickname;
 			}
 
 			RecalculateStrengths();
 		}
-
-
 
 		private void ClearRows(PlayerBoardState player)
 		{
@@ -845,8 +852,7 @@ namespace Gwent.Core
 			}
 		}
 
-
-		#endregion
+		#endregion Pass / Resign / Leader
 
 		#region Scorch / Recalc
 
@@ -998,6 +1004,6 @@ namespace Gwent.Core
 			ApplyTightBond(BoardState.GuestPlayerBoard.SiegeRow);
 		}
 
-		#endregion
+		#endregion Scorch / Recalc
 	}
 }

@@ -1,8 +1,8 @@
-﻿using System.Diagnostics;
+﻿using Gwent.Core;
+using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
-using Gwent.Core;
 
 namespace Gwent.Client
 {
@@ -189,6 +189,5 @@ namespace Gwent.Client
 				return null;
 			}
 		}
-		
 	}
 }

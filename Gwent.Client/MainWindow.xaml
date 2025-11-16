@@ -6,6 +6,6 @@
     <Grid>
         <!-- Główny Frame, w którym będą ładowane strony (Page) -->
         <Frame x:Name="MainFrame"
-               NavigationUIVisibility="Hidden"/>
+               NavigationUIVisibility="Hidden" />
     </Grid>
 </Window>

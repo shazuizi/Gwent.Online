@@ -1,7 +1,5 @@
-﻿using System;
+﻿using Gwent.Core;
 using System.Diagnostics;
-using System.Threading.Tasks;
-using Gwent.Core;
 
 namespace Gwent.Client
 {
@@ -30,7 +28,9 @@ namespace Gwent.Client
 		public GameRole RequestedGameRole => gameRoleRequestedByUser;
 
 		public event EventHandler? GameSessionUpdated;
+
 		public event EventHandler? GameShouldStart;
+
 		public event EventHandler? ServerDisconnected;
 
 		/// <summary>

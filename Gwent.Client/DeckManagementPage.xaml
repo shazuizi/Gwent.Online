@@ -4,33 +4,33 @@
       Title="DeckManagementPage">
     <Grid Margin="10">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <TextBlock Grid.Row="0"
                    Text="Deck Management"
                    FontSize="24"
-                   Margin="0,0,0,10"/>
+                   Margin="0,0,0,10" />
 
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="2*"/>
-                <ColumnDefinition Width="3*"/>
+                <ColumnDefinition Width="2*" />
+                <ColumnDefinition Width="3*" />
             </Grid.ColumnDefinitions>
 
             <GroupBox Header="Available Decks" Grid.Column="0" Margin="0,0,10,0">
                 <ListBox x:Name="DecksListBox"
-                         DisplayMemberPath="DeckName"/>
+                         DisplayMemberPath="DeckName" />
             </GroupBox>
 
             <GroupBox Header="Selected Deck" Grid.Column="1">
                 <StackPanel>
                     <TextBlock x:Name="SelectedDeckNameTextBlock"
                                FontSize="16"
-                               Margin="0,0,0,10"/>
-                    <TextBlock x:Name="SelectedDeckDetailsTextBlock"/>
+                               Margin="0,0,0,10" />
+                    <TextBlock x:Name="SelectedDeckDetailsTextBlock" />
                 </StackPanel>
             </GroupBox>
         </Grid>
@@ -43,11 +43,11 @@
                     Content="Set as active deck"
                     Width="150"
                     Margin="0,0,10,0"
-                    Click="SetAsActiveDeckButton_Click"/>
+                    Click="SetAsActiveDeckButton_Click" />
             <Button x:Name="BackButton"
                     Content="Back"
                     Width="100"
-                    Click="BackButton_Click"/>
+                    Click="BackButton_Click" />
         </StackPanel>
     </Grid>
 </Page>

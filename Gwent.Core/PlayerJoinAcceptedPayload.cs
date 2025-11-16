@@ -1,6 +1,4 @@
-﻿using Gwent.Core;
-
-namespace Gwent.Core
+﻿namespace Gwent.Core
 {
 	/// <summary>
 	/// Dane odsyłane przez serwer przy akceptacji dołączenia gracza.
