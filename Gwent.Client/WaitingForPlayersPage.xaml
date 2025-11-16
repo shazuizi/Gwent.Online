@@ -8,6 +8,15 @@
                        HorizontalAlignment="Center"
                        Margin="0,0,0,10"
                        FontSize="18"/>
+
+            <!-- Status połączenia -->
+            <TextBlock x:Name="ConnectionStatusTextBlock"
+                       Text="Connecting to server..."
+                       HorizontalAlignment="Center"
+                       Margin="0,0,0,10"
+                       FontSize="14"
+                       Foreground="Gray"/>
+
             <Button x:Name="CancelButton"
                     Content="Cancel"
                     Width="100"
