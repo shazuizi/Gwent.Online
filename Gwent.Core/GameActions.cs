@@ -1,32 +1,33 @@
 ﻿namespace Gwent.Core
 {
-	/// <summary>
-	/// Typ akcji wykonywanej przez gracza.
-	/// </summary>
 	public enum GameActionType
 	{
 		PlayCard,
 		PassTurn,
-		Resign
+		Resign,
+		Mulligan,
+		UseLeaderAbility
 	}
 
-	/// <summary>
-	/// Dane pojedynczej akcji wysyłanej przez klienta na serwer.
-	/// </summary>
 	public class GameActionPayload
 	{
 		public GameActionType ActionType { get; set; }
 
 		public string ActingPlayerNickname { get; set; } = string.Empty;
 
+		/// <summary>
+		/// Id karty źródłowej (np. karta z ręki, którą zagrywamy / lider).
+		/// </summary>
 		public string? CardInstanceId { get; set; }
+
+		/// <summary>
+		/// Id karty celu (np. karta z cmentarza dla Medica, karta z rzędu dla Decoy/Mardroeme).
+		/// </summary>
+		public string? TargetInstanceId { get; set; }
 
 		public CardRow? TargetRow { get; set; }
 	}
 
-	/// <summary>
-	/// Payload wysyłany przez serwer do klientów ze zaktualizowanym stanem gry.
-	/// </summary>
 	public class GameStateUpdatePayload
 	{
 		public GameBoardState BoardState { get; set; } = new GameBoardState();
