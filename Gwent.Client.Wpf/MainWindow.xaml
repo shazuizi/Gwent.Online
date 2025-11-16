@@ -4,13 +4,31 @@
         Title="Gwint Online" Height="600" Width="900">
     <Grid Margin="10">
         <Grid.RowDefinitions>
-            <RowDefinition Height="2*" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="2*" />
+            <RowDefinition Height="Auto"/>
+            <!-- nicki -->
+            <RowDefinition Height="2*"/>
+            <!-- stół -->
+            <RowDefinition Height="Auto"/>
+            <!-- przyciski -->
+            <RowDefinition Height="2*"/>
+            <!-- ręka -->
         </Grid.RowDefinitions>
 
+        <!-- NICKI GRACZY -->
+        <DockPanel Grid.Row="0" Margin="0,0,0,10">
+            <StackPanel Orientation="Vertical" DockPanel.Dock="Left">
+                <TextBlock Text="Ty:" FontWeight="Bold"/>
+                <TextBlock x:Name="TxtMyNick"/>
+            </StackPanel>
+
+            <StackPanel Orientation="Vertical" DockPanel.Dock="Right" HorizontalAlignment="Right">
+                <TextBlock Text="Przeciwnik:" FontWeight="Bold" HorizontalAlignment="Right"/>
+                <TextBlock x:Name="TxtEnemyNick" HorizontalAlignment="Right"/>
+            </StackPanel>
+        </DockPanel>
+
         <!-- STÓŁ -->
-        <StackPanel Grid.Row="0">
+        <StackPanel Grid.Row="1">
             <TextBlock Text="Stół - Twoje karty" FontWeight="Bold" Margin="0,0,0,5" />
             <TextBlock Text="Melee" FontWeight="SemiBold"/>
             <ItemsControl x:Name="BoardMelee" Margin="0,0,0,5" />
@@ -21,16 +39,14 @@
         </StackPanel>
 
         <!-- PANEL STEROWANIA -->
-        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,10,0,10">
-            <Button x:Name="BtnPlay" Content="Zagraj kartę"
-                    Width="120" Margin="0,0,10,0" Click="BtnPlay_Click"/>
-            <Button x:Name="BtnPass" Content="Pas"
-                    Width="80" Click="BtnPass_Click"/>
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,10,0,10">
+            <Button x:Name="BtnPlay" Content="Zagraj kartę" Width="120" Margin="0,0,10,0" Click="BtnPlay_Click"/>
+            <Button x:Name="BtnPass" Content="Pas" Width="80" Click="BtnPass_Click"/>
             <TextBlock x:Name="TxtStatus" Margin="20,0,0,0" VerticalAlignment="Center"/>
         </StackPanel>
 
         <!-- RĘKA -->
-        <StackPanel Grid.Row="2">
+        <StackPanel Grid.Row="3">
             <TextBlock Text="Twoja ręka" FontWeight="Bold" Margin="0,0,0,5" />
             <ListBox x:Name="HandList" DisplayMemberPath="Name" />
         </StackPanel>
