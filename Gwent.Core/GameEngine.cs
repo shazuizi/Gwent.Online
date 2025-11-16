@@ -19,7 +19,7 @@ namespace Gwent.Core
 
 		/// <summary>
 		/// Inicjalizuje nową grę na podstawie konfiguracji sesji – tworzy talie,
-		/// tasuje je i rozdaje początkowe karty.
+		/// tasuje je i rozdaje początkowe karty, przydziela dowódców.
 		/// </summary>
 		public void InitializeNewGame(GameSessionConfiguration sessionConfiguration)
 		{
@@ -42,11 +42,16 @@ namespace Gwent.Core
 				ActivePlayerNickname = sessionConfiguration.HostPlayer.Nickname,
 				CurrentRoundNumber = 1,
 				IsGameFinished = false,
-				WinnerNickname = null
+				WinnerNickname = null,
+				WeatherCards = new List<GwentCard>()
 			};
 
 			BoardState.HostPlayerBoard.Deck = CreateSimpleTestDeck(FactionType.NorthernRealms, BoardState.HostPlayerBoard.PlayerNickname);
 			BoardState.GuestPlayerBoard.Deck = CreateSimpleTestDeck(FactionType.Nilfgaard, BoardState.GuestPlayerBoard.PlayerNickname);
+
+			// prości dowódcy – tylko do wyświetlenia w UI
+			BoardState.HostPlayerBoard.LeaderCard = CreateLeaderCard(FactionType.NorthernRealms, BoardState.HostPlayerBoard.PlayerNickname);
+			BoardState.GuestPlayerBoard.LeaderCard = CreateLeaderCard(FactionType.Nilfgaard, BoardState.GuestPlayerBoard.PlayerNickname);
 
 			ShuffleDeck(BoardState.HostPlayerBoard.Deck);
 			ShuffleDeck(BoardState.GuestPlayerBoard.Deck);
@@ -142,6 +147,21 @@ namespace Gwent.Core
 			return deck;
 		}
 
+		private GwentCard CreateLeaderCard(FactionType faction, string ownerNickname)
+		{
+			return new GwentCard
+			{
+				TemplateId = $"leader_{faction}",
+				Name = $"{ownerNickname} Leader",
+				Faction = faction,
+				Category = CardCategory.Leader,
+				BaseStrength = 0,
+				CurrentStrength = 0,
+				DefaultRow = CardRow.WeatherGlobal,
+				IsHero = true
+			};
+		}
+
 		private void ShuffleDeck(List<GwentCard> deck)
 		{
 			for (int i = deck.Count - 1; i > 0; i--)
@@ -221,6 +241,9 @@ namespace Gwent.Core
 				case CardRow.Siege:
 					actingPlayerBoard.SiegeRow.Add(cardToPlay);
 					break;
+				case CardRow.WeatherGlobal:
+					BoardState.WeatherCards.Add(cardToPlay);
+					break;
 				default:
 					actingPlayerBoard.MeleeRow.Add(cardToPlay);
 					break;
@@ -265,6 +288,11 @@ namespace Gwent.Core
 			actingPlayerBoard.LifeTokensRemaining = 0;
 		}
 
+		/// <summary>
+		/// Kończy rundę:
+		/// - przegrany traci 1 życie,
+		/// - jeśli ma 0 żyć → drugi gracz wygrywa grę.
+		/// </summary>
 		private void EndRound()
 		{
 			int hostStrength = BoardState.HostPlayerBoard.GetTotalStrength();
@@ -289,6 +317,8 @@ namespace Gwent.Core
 				roundWinner.RoundsWon++;
 				roundLoser.LifeTokensRemaining--;
 
+				// 👉 tu jest dokładnie to o co prosiłeś:
+				// jeśli przegrany ma 0 żyć, gra się kończy, drugi wygrywa.
 				if (roundLoser.LifeTokensRemaining <= 0)
 				{
 					BoardState.IsGameFinished = true;
@@ -305,6 +335,7 @@ namespace Gwent.Core
 
 			BoardState.CurrentRoundNumber++;
 
+			// nową rundę zaczyna host (na razie prosto)
 			BoardState.ActivePlayerNickname = BoardState.HostPlayerBoard.PlayerNickname;
 		}
 
