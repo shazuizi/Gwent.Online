@@ -14,18 +14,13 @@
             <!-- ręka -->
         </Grid.RowDefinitions>
 
-        <!-- NICKI GRACZY -->
-        <DockPanel Grid.Row="0" Margin="0,0,0,10">
-            <StackPanel Orientation="Vertical" DockPanel.Dock="Left">
-                <TextBlock Text="Ty:" FontWeight="Bold"/>
-                <TextBlock x:Name="TxtMyNick"/>
-            </StackPanel>
-
-            <StackPanel Orientation="Vertical" DockPanel.Dock="Right" HorizontalAlignment="Right">
-                <TextBlock Text="Przeciwnik:" FontWeight="Bold" HorizontalAlignment="Right"/>
-                <TextBlock x:Name="TxtEnemyNick" HorizontalAlignment="Right"/>
-            </StackPanel>
-        </DockPanel>
+        <!-- Nicki -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
+            <TextBlock Text="Ty: " FontWeight="Bold"/>
+            <TextBlock x:Name="TxtMeName" Margin="0,0,20,0"/>
+            <TextBlock Text="Przeciwnik: " FontWeight="Bold"/>
+            <TextBlock x:Name="TxtOppName"/>
+        </StackPanel>
 
         <!-- STÓŁ -->
         <StackPanel Grid.Row="1">

@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
 using System.IO;
-using System.Net.Sockets;
 using System.Text.Json;
 using System.Windows;
 
@@ -9,15 +8,7 @@ namespace Gwent.Client.Wpf
 {
 	public partial class LoginWindow : Window
 	{
-		private class Config
-		{
-			public string Nickname { get; set; } = "Gracz";
-			public string ServerAddress { get; set; } = "127.0.0.1";
-			public int Port { get; set; } = 9000;
-			public bool IsHost { get; set; } = true;
-		}
-
-		private const string ConfigFileName = "gwent.config.json";
+		private const string ConfigFileName = "gwent_config.json";
 
 		public LoginWindow()
 		{
@@ -25,162 +16,153 @@ namespace Gwent.Client.Wpf
 			LoadConfig();
 		}
 
+		private string GetConfigPath()
+		{
+			var folder = Path.Combine(
+				Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+				"Gwent.Online");
+			Directory.CreateDirectory(folder);
+			return Path.Combine(folder, ConfigFileName);
+		}
+
 		private void LoadConfig()
 		{
 			try
 			{
-				if (File.Exists(ConfigFileName))
+				var path = GetConfigPath();
+				if (!File.Exists(path)) return;
+
+				var json = File.ReadAllText(path);
+				var config = JsonSerializer.Deserialize<LoginConfig>(json);
+				if (config == null) return;
+
+				TxtNick.Text = config.Nick ?? "";
+				TxtAddress.Text = config.Address ?? "127.0.0.1";
+				TxtPort.Text = config.Port.ToString();
+
+				if (config.IsHost)
 				{
-					var json = File.ReadAllText(ConfigFileName);
-					var cfg = JsonSerializer.Deserialize<Config>(json);
-					if (cfg != null)
-					{
-						TxtNickname.Text = cfg.Nickname;
-						TxtServerAddress.Text = cfg.ServerAddress;
-						TxtPort.Text = cfg.Port.ToString();
-						RbHost.IsChecked = cfg.IsHost;
-						RbJoin.IsChecked = !cfg.IsHost;
-					}
+					RbHost.IsChecked = true;
+					RbJoin.IsChecked = false;
+				}
+				else
+				{
+					RbHost.IsChecked = false;
+					RbJoin.IsChecked = true;
 				}
 			}
 			catch
 			{
-				// jak coś pójdzie nie tak z configiem – olewamy
+				// jak się coś wywali przy odczycie – ignorujemy
 			}
 		}
 
-		private void SaveConfig(Config cfg)
+		private void SaveConfig(LoginConfig config)
 		{
 			try
 			{
-				var json = JsonSerializer.Serialize(cfg, new JsonSerializerOptions { WriteIndented = true });
-				File.WriteAllText(ConfigFileName, json);
+				var path = GetConfigPath();
+				var json = JsonSerializer.Serialize(config, new JsonSerializerOptions
+				{
+					WriteIndented = true
+				});
+				File.WriteAllText(path, json);
 			}
 			catch
 			{
-				// brak uprawnień itp. – nie zabijamy przez to aplikacji
+				// brak zapisu = przeżyjemy
 			}
 		}
-		private void BtnOk_Click(object sender, RoutedEventArgs e)
+
+		private void Ok_Click(object sender, RoutedEventArgs e)
 		{
-			string nick = TxtNickname.Text;
-			string ip = TxtServerAddress.Text;
-			int port = int.Parse(TxtPort.Text);
+			var nick = TxtNick.Text.Trim();
+			var addr = TxtAddress.Text.Trim();
+			var portText = TxtPort.Text.Trim();
 
-			// np. jeśli zaznaczone "Hostuj" → jesteś P1, jeśli "Dołącz" → P2
-			string playerId = RbHost.IsChecked == true ? "P1" : "P2";
-
-			var main = new MainWindow(playerId, nick, ip, port);
-			main.Show();
-			this.Close();
-		}
-
-		private async void Ok_Click(object sender, RoutedEventArgs e)
-		{
-			TxtError.Text = "";
-
-			if (string.IsNullOrWhiteSpace(TxtNickname.Text))
+			if (string.IsNullOrWhiteSpace(nick))
 			{
-				TxtError.Text = "Podaj nick.";
+				MessageBox.Show("Podaj nick.", "Błąd", MessageBoxButton.OK, MessageBoxImage.Error);
+				return;
+			}
+			if (string.IsNullOrWhiteSpace(addr))
+			{
+				MessageBox.Show("Podaj adres serwera.", "Błąd", MessageBoxButton.OK, MessageBoxImage.Error);
+				return;
+			}
+			if (!int.TryParse(portText, out var port) || port <= 0 || port > 65535)
+			{
+				MessageBox.Show("Nieprawidłowy port.", "Błąd", MessageBoxButton.OK, MessageBoxImage.Error);
 				return;
 			}
 
-			if (!int.TryParse(TxtPort.Text, out int port) || port <= 0 || port > 65535)
-			{
-				TxtError.Text = "Niepoprawny port.";
-				return;
-			}
+			bool isHost = RbHost.IsChecked == true;
 
-			var isHost = RbHost.IsChecked == true;
-			var serverAddress = TxtServerAddress.Text.Trim();
-
-			var cfg = new Config
+			// zapis do configu
+			var cfg = new LoginConfig
 			{
-				Nickname = TxtNickname.Text.Trim(),
-				ServerAddress = serverAddress,
+				Nick = nick,
+				Address = addr,
 				Port = port,
 				IsHost = isHost
 			};
 			SaveConfig(cfg);
 
-			// Jeśli hostujemy, spróbuj uruchomić serwer
 			if (isHost)
 			{
-				// sprawdź, czy serwer już przypadkiem nie działa na tym porcie
-				bool serverAlreadyRunning = await IsServerReachable("127.0.0.1", port);
-
-				if (!serverAlreadyRunning)
+				// HOST – odpalamy serwer na wybranym porcie (tylko jeśli nie działa)
+				try
 				{
-					try
-					{
-						StartServerProcess(port);
-					}
-					catch (Exception ex)
-					{
-						TxtError.Text = "Błąd startu serwera: " + ex.Message;
-						return;
-					}
+					StartServerProcess(port);
+				}
+				catch (Exception ex)
+				{
+					MessageBox.Show("Nie udało się uruchomić serwera:\n" + ex.Message,
+						"Błąd serwera", MessageBoxButton.OK, MessageBoxImage.Error);
+					return;
 				}
 
-				// klient łączy się zawsze na localhost
-				serverAddress = "127.0.0.1";
+				// jako host zwykle łączysz się na localhost
+				addr = "127.0.0.1";
 			}
 
-			// Otwórz okno gry i przekaż ustawienia
-			var gameWindow = new MainWindow(
-				playerId: isHost ? "P1" : "P2",
-				myNick: cfg.Nickname,
-				serverAddress: serverAddress,
-				serverPort: port);
+			// Tworzymy okno gry, przekazujemy nick, adres i port
+			var main = new MainWindow(nick, addr, port);
+			Application.Current.MainWindow = main;
+			main.Show();
 
-			gameWindow.Show();
 			Close();
 		}
 
 		private void StartServerProcess(int port)
 		{
-			// Ścieżka do Gwent.Server.exe – względna względem folderu klienta (Debug)
-			// Zakładam strukturę:
-			//  Gwent.Online/
-			//    Gwent.Client.Wpf/bin/Debug/net8.0-windows/...
-			//    Gwent.Server/bin/Debug/net8.0/...
-
-			var baseDir = AppDomain.CurrentDomain.BaseDirectory;
-			var serverPathRelative = Path.Combine(
-				baseDir,
-				@"..\..\..\..\Gwent.Server\bin\Debug\net8.0\Gwent.Server.exe");
-
-			var serverExe = Path.GetFullPath(serverPathRelative);
-
-			if (!File.Exists(serverExe))
-				throw new FileNotFoundException("Nie znaleziono Gwent.Server.exe", serverExe);
+			// zakładamy, że Gwent.Server.exe jest obok klienta po publikacji
+			// w czasie developmentu możesz podać pełną ścieżkę do bin\Debug\net8.0\Gwent.Server.exe
+			var exeName = "Gwent.Server.exe";
 
 			var startInfo = new ProcessStartInfo
 			{
-				FileName = serverExe,
+				FileName = exeName,
 				Arguments = port.ToString(),
-				UseShellExecute = false,
-				CreateNoWindow = true
+				UseShellExecute = true,
+				WorkingDirectory = AppDomain.CurrentDomain.BaseDirectory,
+				CreateNoWindow = false
 			};
 
 			Process.Start(startInfo);
 		}
 
-		private static async System.Threading.Tasks.Task<bool> IsServerReachable(string host, int port)
+		private void Cancel_Click(object sender, RoutedEventArgs e)
 		{
-			try
-			{
-				using var client = new TcpClient();
-				var connectTask = client.ConnectAsync(host, port);
-				var timeoutTask = System.Threading.Tasks.Task.Delay(500);
-
-				var finished = await System.Threading.Tasks.Task.WhenAny(connectTask, timeoutTask);
-				return finished == connectTask && client.Connected;
-			}
-			catch
-			{
-				return false;
-			}
+			Application.Current.Shutdown();
 		}
+	}
+
+	public class LoginConfig
+	{
+		public string? Nick { get; set; }
+		public string? Address { get; set; }
+		public int Port { get; set; }
+		public bool IsHost { get; set; }
 	}
 }
