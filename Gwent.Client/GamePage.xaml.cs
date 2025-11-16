@@ -229,13 +229,25 @@ namespace Gwent.Client
 
 			SurrenderButton.IsEnabled = !boardState.IsGameFinished;
 
-			if (boardState.IsGameFinished && !gameResultAlreadyShown && boardState.WinnerNickname != null)
+			if (boardState.IsGameFinished && !gameResultAlreadyShown)
 			{
 				gameResultAlreadyShown = true;
 
-				string message = boardState.WinnerNickname == localBoard.PlayerNickname
-					? "You won the game!"
-					: "You lost the game.";
+				string message;
+
+				if (boardState.WinnerNickname == null)
+				{
+					// REMIS
+					message = "The game ended in a draw.";
+				}
+				else if (boardState.WinnerNickname == localBoard.PlayerNickname)
+				{
+					message = "You won the game!";
+				}
+				else
+				{
+					message = "You lost the game.";
+				}
 
 				MessageBox.Show(message, "Game finished", MessageBoxButton.OK, MessageBoxImage.Information);
 
@@ -243,6 +255,7 @@ namespace Gwent.Client
 				mainWindow.CurrentGameClientController = null;
 				mainWindow.NavigateToMainMenuPage();
 			}
+
 		}
 
 		private void ClearAllListBoxes()
