@@ -2,6 +2,7 @@
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       Title="GamePage">
+
     <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -9,7 +10,7 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Pasek z nickami, rolami, siłą, życiami, leaderem, talią, cmentarzem i pogodą -->
+        <!-- Górny pasek z informacjami o graczach, rundzie, pogodą itd. -->
         <Border Grid.Row="0" Padding="5" BorderThickness="0,0,0,1" BorderBrush="Gray">
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -18,7 +19,7 @@
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Ty -->
+                <!-- Lokalny gracz -->
                 <StackPanel Grid.Column="0" Orientation="Vertical">
                     <TextBlock Text="You" FontWeight="Bold"/>
                     <TextBlock x:Name="LocalPlayerNicknameTextBlock"/>
@@ -59,139 +60,170 @@
             </Grid>
         </Border>
 
-        <!-- Plansza: rzędy graczy z wynikiem każdego rzędu oraz graveyard -->
+        <!-- Środkowy obszar: plansza + panel szczegółów karty -->
         <Grid Grid.Row="1" Margin="0,10,0,10">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-                <RowDefinition Height="Auto"/>
-            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="3*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
 
-            <TextBlock Grid.Row="0" Text="Opponent rows" FontWeight="Bold" Margin="0,0,0,5"/>
-
-            <Grid Grid.Row="1">
+            <!-- Plansza -->
+            <Grid Grid.Column="0">
                 <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
-                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <GroupBox Grid.Row="0" Margin="0,0,0,5">
-                    <GroupBox.Header>
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="Melee"/>
-                            <TextBlock Text=" (" />
-                            <TextBlock x:Name="OpponentMeleeStrengthTextBlock"/>
-                            <TextBlock Text=")" />
-                        </StackPanel>
-                    </GroupBox.Header>
-                    <ListBox x:Name="OpponentMeleeRowListBox"
-                         DisplayMemberPath="Name"
-                         Tag="Melee"
-                         SelectionChanged="OpponentBoardRow_SelectionChanged"/>
-                </GroupBox>
+                <TextBlock Grid.Row="0" Text="Opponent rows" FontWeight="Bold" Margin="0,0,0,5"/>
 
-                <GroupBox Grid.Row="1" Margin="0,0,0,5">
-                    <GroupBox.Header>
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="Ranged"/>
-                            <TextBlock Text=" (" />
-                            <TextBlock x:Name="OpponentRangedStrengthTextBlock"/>
-                            <TextBlock Text=")" />
-                        </StackPanel>
-                    </GroupBox.Header>
-                    <ListBox x:Name="OpponentRangedRowListBox"
-                         DisplayMemberPath="Name"
-                         Tag="Ranged"
-                         SelectionChanged="OpponentBoardRow_SelectionChanged"/>
+                <!-- Rzędy przeciwnika -->
+                <Grid Grid.Row="1">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
 
-                </GroupBox>
+                    <GroupBox Grid.Row="0" Margin="0,0,0,5">
+                        <GroupBox.Header>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Melee"/>
+                                <TextBlock Text=" (" />
+                                <TextBlock x:Name="OpponentMeleeStrengthTextBlock"/>
+                                <TextBlock Text=")" />
+                            </StackPanel>
+                        </GroupBox.Header>
+                        <ListBox x:Name="OpponentMeleeRowListBox"
+                                 DisplayMemberPath="Name"
+                                 Tag="Melee"
+                                 SelectionChanged="OpponentBoardRow_SelectionChanged"/>
+                    </GroupBox>
 
-                <GroupBox Grid.Row="2">
-                    <GroupBox.Header>
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="Siege"/>
-                            <TextBlock Text=" (" />
-                            <TextBlock x:Name="OpponentSiegeStrengthTextBlock"/>
-                            <TextBlock Text=")" />
-                        </StackPanel>
-                    </GroupBox.Header>
-                    <ListBox x:Name="OpponentSiegeRowListBox"
-                         DisplayMemberPath="Name"
-                         Tag="Siege"
-                         SelectionChanged="OpponentBoardRow_SelectionChanged"/>
+                    <GroupBox Grid.Row="1" Margin="0,0,0,5">
+                        <GroupBox.Header>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Ranged"/>
+                                <TextBlock Text=" (" />
+                                <TextBlock x:Name="OpponentRangedStrengthTextBlock"/>
+                                <TextBlock Text=")" />
+                            </StackPanel>
+                        </GroupBox.Header>
+                        <ListBox x:Name="OpponentRangedRowListBox"
+                                 DisplayMemberPath="Name"
+                                 Tag="Ranged"
+                                 SelectionChanged="OpponentBoardRow_SelectionChanged"/>
+                    </GroupBox>
 
+                    <GroupBox Grid.Row="2">
+                        <GroupBox.Header>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Siege"/>
+                                <TextBlock Text=" (" />
+                                <TextBlock x:Name="OpponentSiegeStrengthTextBlock"/>
+                                <TextBlock Text=")" />
+                            </StackPanel>
+                        </GroupBox.Header>
+                        <ListBox x:Name="OpponentSiegeRowListBox"
+                                 DisplayMemberPath="Name"
+                                 Tag="Siege"
+                                 SelectionChanged="OpponentBoardRow_SelectionChanged"/>
+                    </GroupBox>
+                </Grid>
+
+                <TextBlock Grid.Row="2" Text="Your rows" FontWeight="Bold" Margin="0,10,0,5"/>
+
+                <!-- Rzędy lokalnego gracza -->
+                <Grid Grid.Row="3">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <GroupBox Grid.Row="0" Margin="0,0,0,5">
+                        <GroupBox.Header>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Melee"/>
+                                <TextBlock Text=" (" />
+                                <TextBlock x:Name="LocalMeleeStrengthTextBlock"/>
+                                <TextBlock Text=")" />
+                            </StackPanel>
+                        </GroupBox.Header>
+                        <ListBox x:Name="LocalMeleeRowListBox"
+                                 DisplayMemberPath="Name"
+                                 Tag="Melee"
+                                 SelectionChanged="LocalBoardRow_SelectionChanged"/>
+                    </GroupBox>
+
+                    <GroupBox Grid.Row="1" Margin="0,0,0,5">
+                        <GroupBox.Header>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Ranged"/>
+                                <TextBlock Text=" (" />
+                                <TextBlock x:Name="LocalRangedStrengthTextBlock"/>
+                                <TextBlock Text=")" />
+                            </StackPanel>
+                        </GroupBox.Header>
+                        <ListBox x:Name="LocalRangedRowListBox"
+                                 DisplayMemberPath="Name"
+                                 Tag="Ranged"
+                                 SelectionChanged="LocalBoardRow_SelectionChanged"/>
+                    </GroupBox>
+
+                    <GroupBox Grid.Row="2">
+                        <GroupBox.Header>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="Siege"/>
+                                <TextBlock Text=" (" />
+                                <TextBlock x:Name="LocalSiegeStrengthTextBlock"/>
+                                <TextBlock Text=")" />
+                            </StackPanel>
+                        </GroupBox.Header>
+                        <ListBox x:Name="LocalSiegeRowListBox"
+                                 DisplayMemberPath="Name"
+                                 Tag="Siege"
+                                 SelectionChanged="LocalBoardRow_SelectionChanged"/>
+                    </GroupBox>
+                </Grid>
+
+                <!-- Cmentarz lokalnego gracza -->
+                <GroupBox Grid.Row="4" Header="Your graveyard" Margin="0,10,0,0">
+                    <ListBox x:Name="LocalGraveyardListBox"
+                             Height="80"
+                             DisplayMemberPath="Name"
+                             SelectionChanged="LocalGraveyardListBox_SelectionChanged"/>
                 </GroupBox>
             </Grid>
 
-            <TextBlock Grid.Row="2" Text="Your rows" FontWeight="Bold" Margin="0,10,0,5"/>
-
-            <Grid Grid.Row="3">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="*"/>
-                </Grid.RowDefinitions>
-
-                <GroupBox Grid.Row="0" Margin="0,0,0,5">
-                    <GroupBox.Header>
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="Melee"/>
-                            <TextBlock Text=" (" />
-                            <TextBlock x:Name="LocalMeleeStrengthTextBlock"/>
-                            <TextBlock Text=")" />
-                        </StackPanel>
-                    </GroupBox.Header>
-                    <ListBox x:Name="LocalMeleeRowListBox"
-                         DisplayMemberPath="Name"
-                         Tag="Melee"
-                         SelectionChanged="LocalBoardRow_SelectionChanged"/>
-
-
-                </GroupBox>
-
-                <GroupBox Grid.Row="1" Margin="0,0,0,5">
-                    <GroupBox.Header>
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="Ranged"/>
-                            <TextBlock Text=" (" />
-                            <TextBlock x:Name="LocalRangedStrengthTextBlock"/>
-                            <TextBlock Text=")" />
-                        </StackPanel>
-                    </GroupBox.Header>
-                    <ListBox x:Name="LocalRangedRowListBox"
-                         DisplayMemberPath="Name"
-                         Tag="Ranged"
-                         SelectionChanged="LocalBoardRow_SelectionChanged"/>
-
-
-                </GroupBox>
-
-                <GroupBox Grid.Row="2">
-                    <GroupBox.Header>
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="Siege"/>
-                            <TextBlock Text=" (" />
-                            <TextBlock x:Name="LocalSiegeStrengthTextBlock"/>
-                            <TextBlock Text=")" />
-                        </StackPanel>
-                    </GroupBox.Header>
-                    <ListBox x:Name="LocalSiegeRowListBox"
-                         DisplayMemberPath="Name"
-                         Tag="Siege"
-                         SelectionChanged="LocalBoardRow_SelectionChanged"/>
-
-                </GroupBox>
-            </Grid>
-
-            <!-- Twój graveyard (potrzebny do targetowania Medica) -->
-            <GroupBox Grid.Row="4" Header="Your graveyard" Margin="0,10,0,0">
-                <ListBox x:Name="LocalGraveyardListBox"
-                         Height="80"
-                         DisplayMemberPath="Name"
-                         SelectionChanged="LocalGraveyardListBox_SelectionChanged"/>
+            <!-- Panel szczegółów wybranej karty -->
+            <GroupBox Grid.Column="1" Header="Selected card" Margin="10,0,0,0">
+                <StackPanel Margin="5">
+                    <TextBlock x:Name="SelectedCardNameTextBlock"
+                               FontSize="16"
+                               FontWeight="Bold"
+                               Text="(no card selected)"
+                               TextWrapping="Wrap" />
+                    <TextBlock x:Name="SelectedCardFactionTextBlock"
+                               Margin="0,5,0,0"
+                               FontSize="12" />
+                    <TextBlock x:Name="SelectedCardCategoryTextBlock"
+                               FontSize="12" />
+                    <TextBlock x:Name="SelectedCardStrengthTextBlock"
+                               Margin="0,5,0,0"
+                               FontSize="13" />
+                    <TextBlock x:Name="SelectedCardAbilitiesTextBlock"
+                               Margin="0,5,0,0"
+                               FontSize="12"
+                               TextWrapping="Wrap" />
+                    <TextBlock Text="Tip: Click a card in your hand, then click a row to play it."
+                               Margin="0,10,0,0"
+                               FontSize="11"
+                               Foreground="Gray"
+                               TextWrapping="Wrap"/>
+                </StackPanel>
             </GroupBox>
         </Grid>
 
@@ -199,17 +231,15 @@
         <DockPanel Grid.Row="2">
             <GroupBox Header="Your hand" DockPanel.Dock="Top" Margin="0,0,10,0">
                 <ListBox x:Name="HandListBox"
-                     DisplayMemberPath="Name"
-                     Height="100"
-                     SelectionChanged="HandListBox_SelectionChanged"/>
-
-
+                         DisplayMemberPath="Name"
+                         Height="100"
+                         SelectionChanged="HandListBox_SelectionChanged"/>
             </GroupBox>
 
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                 <Button x:Name="PlayCardButton"
-                        Content="Play selected card"
-                        Width="150"
+                        Content="Play (click row)"
+                        Width="140"
                         Margin="0,0,10,0"
                         Click="PlayCardButton_Click"/>
                 <Button x:Name="MulliganButton"

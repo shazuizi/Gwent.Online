@@ -86,6 +86,7 @@ namespace Gwent.Server
 					int bytesRead = await clientNetworkStream.ReadAsync(readBuffer, 0, readBuffer.Length, cancellationToken);
 					if (bytesRead <= 0)
 					{
+						// klient zamknął połączenie w sposób „grzeczny”
 						break;
 					}
 
@@ -134,10 +135,24 @@ namespace Gwent.Server
 			}
 			catch (OperationCanceledException)
 			{
-				// zignoruj
+				// ignorujemy – serwer się wyłącza / token przerwany
+			}
+			catch (IOException ioEx) when (ioEx.InnerException is SocketException se &&
+										  se.SocketErrorCode == SocketError.ConnectionReset)
+			{
+				// 👇 TO jest dokładnie Twój przypadek:
+				// „Istniejące połączenie zostało gwałtownie zamknięte przez zdalnego hosta”
+				Console.WriteLine($"[Server] Client {client.Client.RemoteEndPoint} disconnected (connection reset): {ioEx.Message}");
+				// nie rzucamy dalej – traktujemy jako normalne rozłączenie klienta
+			}
+			catch (IOException ioEx)
+			{
+				// inne błędy IO – logujemy, żeby wiedzieć, że coś jest nie tak z siecią
+				Console.WriteLine($"[Server] IO error in HandleClientAsync: {ioEx}");
 			}
 			catch (Exception ex)
 			{
+				// dopiero tutaj „prawdziwie” nieobsłużone błędy
 				Console.WriteLine($"[Server] Unhandled exception in HandleClientAsync: {ex}");
 			}
 			finally
