@@ -29,6 +29,8 @@ namespace Gwent.Core
 		/// </summary>
 		public bool LeaderAbilityUsed { get; set; }
 
+		
+
 		public int GetTotalStrength()
 		{
 			return MeleeRow.Sum(c => c.CurrentStrength) +
@@ -61,5 +63,7 @@ namespace Gwent.Core
 
 		public bool IsGameFinished { get; set; }
 		public string? WinnerNickname { get; set; }
+
+		public List<string> GameLog { get; set; } = new List<string>();
 	}
 }

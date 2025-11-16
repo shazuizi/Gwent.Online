@@ -52,6 +52,8 @@ namespace Gwent.Core
 			DrawFromDeck(BoardState.HostPlayerBoard, 10);
 			DrawFromDeck(BoardState.GuestPlayerBoard, 10);
 
+			AddLogEntry("Game started.");
+
 			RecalculateStrengths();
 		}
 
@@ -336,6 +338,26 @@ namespace Gwent.Core
 
 		#endregion
 
+		#region LogEntry
+
+		private void AddLogEntry(string message)
+		{
+			if (BoardState.GameLog == null)
+			{
+				BoardState.GameLog = new List<string>();
+			}
+
+			BoardState.GameLog.Add(message);
+
+			// prosta rotacja – max 200 wpisów
+			if (BoardState.GameLog.Count > 200)
+			{
+				BoardState.GameLog.RemoveAt(0);
+			}
+		}
+
+		#endregion
+
 		#region Mulligan
 
 		private void ApplyMulliganAction(GameActionPayload action)
@@ -369,6 +391,7 @@ namespace Gwent.Core
 			player.MulligansRemaining--;
 
 			RecalculateStrengths();
+			AddLogEntry($"{player.PlayerNickname} mulliganed {card.Name}.");
 		}
 
 
@@ -440,6 +463,7 @@ namespace Gwent.Core
 			}
 
 			RecalculateStrengths();
+			AddLogEntry($"{actingPlayer.PlayerNickname} played {card.Name}.");
 			SwitchTurnToOpponent(actingPlayer.PlayerNickname);
 		}
 
@@ -610,6 +634,7 @@ namespace Gwent.Core
 				return;
 
 			player.HasPassedCurrentRound = true;
+			AddLogEntry($"{player.PlayerNickname} passed.");
 
 			var opponent = GetOpponentBoard(action.ActingPlayerNickname);
 
@@ -637,7 +662,7 @@ namespace Gwent.Core
 
 			BoardState.IsGameFinished = true;
 			BoardState.WinnerNickname = opponent.PlayerNickname;
-
+			AddLogEntry($"{player.PlayerNickname} surrendered. {opponent.PlayerNickname} wins the game.");
 			player.LifeTokensRemaining = 0;
 		}
 
@@ -663,6 +688,7 @@ namespace Gwent.Core
 
 			player.LeaderAbilityUsed = true;
 			RecalculateStrengths();
+			AddLogEntry($"{player.PlayerNickname} used leader ability {leader.Name}.");
 			SwitchTurnToOpponent(player.PlayerNickname);
 		}
 
@@ -720,22 +746,28 @@ namespace Gwent.Core
 				host.RoundsWon++;
 				guest.RoundsWon++;
 
+				AddLogEntry($"Round {BoardState.CurrentRoundNumber} ended in a draw. Host: {hostStrength}, Guest: {guestStrength}.");
+
 				// sprawdzamy wynik gry po takim remisie
 				if (host.LifeTokensRemaining <= 0 && guest.LifeTokensRemaining <= 0)
 				{
 					// remis całej gry
 					BoardState.IsGameFinished = true;
 					BoardState.WinnerNickname = null;
+
+					AddLogEntry($"Game ended in a draw.");
 				}
 				else if (host.LifeTokensRemaining <= 0 && guest.LifeTokensRemaining > 0)
 				{
 					BoardState.IsGameFinished = true;
 					BoardState.WinnerNickname = guest.PlayerNickname;
+					AddLogEntry($"Game ended, {guest.PlayerNickname} won.");
 				}
 				else if (guest.LifeTokensRemaining <= 0 && host.LifeTokensRemaining > 0)
 				{
 					BoardState.IsGameFinished = true;
 					BoardState.WinnerNickname = host.PlayerNickname;
+					AddLogEntry($"Game ended, {host.PlayerNickname} won.");
 				}
 			}
 			else if (roundWinner != null && roundLoser != null)
@@ -743,6 +775,8 @@ namespace Gwent.Core
 				roundWinner.RoundsWon++;
 				roundLoser.LifeTokensRemaining--;
 
+				AddLogEntry($"Round {BoardState.CurrentRoundNumber} won by {roundWinner.PlayerNickname}. " +
+				$"Host: {hostStrength}, Guest: {guestStrength}.");
 				// Northern Realms – bonus za WYGRANĄ rundę
 				if (roundWinner.Faction == FactionType.NorthernRealms)
 				{
