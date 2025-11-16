@@ -5,14 +5,11 @@
     <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="2*" />
-            <!-- stół -->
             <RowDefinition Height="Auto" />
-            <!-- przyciski -->
             <RowDefinition Height="2*" />
-            <!-- ręka -->
         </Grid.RowDefinitions>
 
-        <!-- STÓŁ (na razie pokazujemy tylko swoje karty dla P1/P2) -->
+        <!-- STÓŁ -->
         <StackPanel Grid.Row="0">
             <TextBlock Text="Stół - Twoje karty" FontWeight="Bold" Margin="0,0,0,5" />
             <TextBlock Text="Melee" FontWeight="SemiBold"/>
@@ -25,8 +22,10 @@
 
         <!-- PANEL STEROWANIA -->
         <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,10,0,10">
-            <Button x:Name="BtnPlay" Content="Zagraj kartę" Width="120" Margin="0,0,10,0" Click="BtnPlay_Click"/>
-            <Button x:Name="BtnPass" Content="Pas" Width="80" Click="BtnPass_Click"/>
+            <Button x:Name="BtnPlay" Content="Zagraj kartę"
+                    Width="120" Margin="0,0,10,0" Click="BtnPlay_Click"/>
+            <Button x:Name="BtnPass" Content="Pas"
+                    Width="80" Click="BtnPass_Click"/>
             <TextBlock x:Name="TxtStatus" Margin="20,0,0,0" VerticalAlignment="Center"/>
         </StackPanel>
 
