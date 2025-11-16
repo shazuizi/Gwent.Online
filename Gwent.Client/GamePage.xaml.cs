@@ -218,6 +218,19 @@ namespace Gwent.Client
 
 			bool isLocalTurn = boardState.ActivePlayerNickname == localBoard.PlayerNickname;
 
+			if (isLocalTurn)
+			{
+				LocalPlayerNicknameTextBlock.FontWeight = FontWeights.Bold;
+				OpponentNicknameTextBlock.FontWeight = FontWeights.Normal;
+				TurnIndicatorTextBlock.Text = "Your turn";
+			}
+			else
+			{
+				LocalPlayerNicknameTextBlock.FontWeight = FontWeights.Normal;
+				OpponentNicknameTextBlock.FontWeight = FontWeights.Bold;
+				TurnIndicatorTextBlock.Text = "Opponent's turn";
+			}
+
 			bool isMulliganPhaseForLocal =
 				boardState.CurrentRoundNumber == 1 &&
 				localBoard.MulligansRemaining > 0;
@@ -270,6 +283,15 @@ namespace Gwent.Client
 				mainWindow.CurrentGameClientController?.TryStopServerProcess();
 				mainWindow.CurrentGameClientController = null;
 				mainWindow.NavigateToMainMenuPage();
+			}
+
+			GameLogListBox.ItemsSource = boardState.GameLog;
+
+			// auto-scroll do ostatniego wpisu
+			if (boardState.GameLog != null && boardState.GameLog.Any())
+			{
+				var last = boardState.GameLog.Last();
+				GameLogListBox.ScrollIntoView(last);
 			}
 
 			UpdateSelectedCardPanel();
