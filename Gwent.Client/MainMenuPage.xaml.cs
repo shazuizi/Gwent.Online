@@ -148,19 +148,47 @@ namespace Gwent.Client
 				FileName = serverExecutablePath,
 				Arguments = serverPort.ToString(),
 				UseShellExecute = false,
-				CreateNoWindow = true
+				CreateNoWindow = false  // 👈 na razie zostaw konsolę widoczną, żeby widzieć wyjątki
 			};
 
 			try
 			{
-				Process startedProcess = Process.Start(processStartInfo);
+				Process? startedProcess = Process.Start(processStartInfo);
+				if (startedProcess == null)
+				{
+					MessageBox.Show("Failed to start server process (no process reference).",
+						"Error",
+						MessageBoxButton.OK,
+						MessageBoxImage.Error);
+					return null;
+				}
+
+				// 👇 Dajemy serwerowi chwilę na odpalenie i sprawdzamy, czy nie padł.
+				System.Threading.Thread.Sleep(1000);
+
+				if (startedProcess.HasExited)
+				{
+					MessageBox.Show(
+						$"Server process exited immediately with code {startedProcess.ExitCode}. " +
+						"Run Gwent.Server.exe manually to see the error message in console.",
+						"Server crashed",
+						MessageBoxButton.OK,
+						MessageBoxImage.Error);
+
+					return null;
+				}
+
 				return startedProcess;
 			}
-			catch
+			catch (Exception ex)
 			{
-				MessageBox.Show("Failed to start server process.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+				MessageBox.Show($"Failed to start server process:\n{ex.Message}",
+					"Error",
+					MessageBoxButton.OK,
+					MessageBoxImage.Error);
 				return null;
 			}
 		}
+		
 	}
 }

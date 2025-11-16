@@ -66,12 +66,13 @@ namespace Gwent.Server
 
 		/// <summary>
 		/// Obsługuje pojedynczego klienta: odbiera wiadomości, reaguje na żądania dołączenia i gotowości.
+		/// Wiadomości są w formacie JSON zakończonym '\n'.
 		/// </summary>
 		private async Task HandleClientAsync(TcpClient client, CancellationToken cancellationToken)
 		{
 			if (connectedClients.Count >= 2)
 			{
-				// Serwer zapełniony – mógłby odesłać info o odrzuceniu.
+				// Serwer zapełniony – można by tu odesłać info, ale na razie od razu rozłączamy.
 				client.Close();
 				return;
 			}
@@ -81,37 +82,69 @@ namespace Gwent.Server
 			using NetworkStream clientNetworkStream = client.GetStream();
 
 			byte[] readBuffer = new byte[4096];
+			string pendingTextBuffer = string.Empty;
 
 			try
 			{
 				while (!cancellationToken.IsCancellationRequested && client.Connected)
 				{
-					if (!clientNetworkStream.DataAvailable)
-					{
-						await Task.Delay(20, cancellationToken);
-						continue;
-					}
-
 					int bytesRead = await clientNetworkStream.ReadAsync(readBuffer, 0, readBuffer.Length, cancellationToken);
 					if (bytesRead <= 0)
 					{
+						// Klient się odłączył
 						break;
 					}
 
-					string rawMessage = Encoding.UTF8.GetString(readBuffer, 0, bytesRead);
-					NetworkMessage? networkMessage = NetworkMessage.Deserialize(rawMessage);
+					string receivedChunk = Encoding.UTF8.GetString(readBuffer, 0, bytesRead);
+					pendingTextBuffer += receivedChunk;
 
-					if (networkMessage == null)
+					int newlineIndex;
+					while ((newlineIndex = pendingTextBuffer.IndexOf('\n')) >= 0)
 					{
-						continue;
-					}
+						string rawLine = pendingTextBuffer.Substring(0, newlineIndex).Trim();
+						pendingTextBuffer = pendingTextBuffer.Substring(newlineIndex + 1);
 
-					await HandleNetworkMessageAsync(client, clientNetworkStream, networkMessage, cancellationToken);
+						if (string.IsNullOrWhiteSpace(rawLine))
+						{
+							continue;
+						}
+
+						NetworkMessage? networkMessage = null;
+
+						try
+						{
+							networkMessage = NetworkMessage.Deserialize(rawLine);
+						}
+						catch (Exception ex)
+						{
+							Console.WriteLine($"[Server] Failed to deserialize message: {ex.Message}");
+							continue;
+						}
+
+						if (networkMessage == null)
+						{
+							Console.WriteLine("[Server] Received null or invalid message.");
+							continue;
+						}
+
+						try
+						{
+							await HandleNetworkMessageAsync(client, clientNetworkStream, networkMessage, cancellationToken);
+						}
+						catch (Exception ex)
+						{
+							Console.WriteLine($"[Server] Error while handling message {networkMessage.MessageType}: {ex}");
+						}
+					}
 				}
 			}
 			catch (OperationCanceledException)
 			{
-				// Ignorujemy przerwanie.
+				// Normalne wyjście z pętli przy zatrzymaniu serwera.
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"[Server] Unhandled exception in HandleClientAsync: {ex}");
 			}
 			finally
 			{
@@ -240,14 +273,14 @@ namespace Gwent.Server
 		}
 
 		/// <summary>
-		/// Wysyła pojedynczą wiadomość do klienta po TCP.
+		/// Wysyła pojedynczą wiadomość do klienta po TCP jako JSON zakończony '\n'.
 		/// </summary>
 		private async Task SendMessageToClientAsync(
 			NetworkStream clientNetworkStream,
 			NetworkMessage message,
 			CancellationToken cancellationToken)
 		{
-			string serializedMessage = message.Serialize();
+			string serializedMessage = message.Serialize() + "\n";
 			byte[] data = Encoding.UTF8.GetBytes(serializedMessage);
 			await clientNetworkStream.WriteAsync(data, 0, data.Length, cancellationToken);
 		}
