@@ -57,8 +57,18 @@
 
 		public GameBoardState ApplyGameAction(GameActionPayload action)
 		{
+			// Gra skończona – nic już nie rób
 			if (BoardState.IsGameFinished)
+			{
 				return BoardState;
+			}
+
+			// Centralna walidacja – JEDNO miejsce z zasadami „czy akcja w ogóle jest dopuszczalna”
+			if (!ValidateAction(action, out var actingPlayer, out var opponentPlayer))
+			{
+				AddLogEntry($"[Engine] Invalid action {action.ActionType} from {action.ActingPlayerNickname}.");
+				return BoardState;
+			}
 
 			switch (action.ActionType)
 			{
@@ -85,6 +95,74 @@
 
 			return BoardState;
 		}
+
+		/// <summary>
+		/// Centralne miejsce walidacji akcji gry.
+		/// Zasady:
+		/// - akcje nie przechodzą, jeśli gra jest skończona,
+		/// - prawie wszystkie akcje wymagają, żeby był Twój ruch,
+		/// - po pass nie wolno grać ani znowu passować,
+		/// - w 1. rundzie dopóki masz mulligany, wolno tylko Mulligan / Resign.
+		/// </summary>
+		private bool ValidateAction(
+			GameActionPayload payload,
+			out PlayerBoardState actingPlayer,
+			out PlayerBoardState opponentPlayer)
+		{
+			actingPlayer = GetPlayerBoard(payload.ActingPlayerNickname);
+			opponentPlayer = GetOpponentBoard(payload.ActingPlayerNickname);
+
+			// Gracz musi istnieć
+			if (actingPlayer == null || opponentPlayer == null)
+			{
+				return false;
+			}
+
+			// Gra skończona – nic nie wolno
+			if (BoardState.IsGameFinished)
+			{
+				return false;
+			}
+
+			// Większość akcji wymaga, żeby to była tura danego gracza.
+			// WYJĄTKI:
+			// - Mulligan: może być poza turą (pre-game),
+			// - Resign: możesz się poddać niezależnie od tury.
+			if (payload.ActionType != GameActionType.Mulligan &&
+				payload.ActionType != GameActionType.Resign &&
+				BoardState.ActivePlayerNickname != actingPlayer.PlayerNickname)
+			{
+				return false;
+			}
+
+			// Po pass nie wolno już:
+			// - grać kart
+			// - passować drugi raz
+			// - używać zdolności lidera
+			if (actingPlayer.HasPassedCurrentRound &&
+				(payload.ActionType == GameActionType.PlayCard ||
+				 payload.ActionType == GameActionType.PassTurn ||
+				 payload.ActionType == GameActionType.UseLeaderAbility))
+			{
+				return false;
+			}
+
+			// Wymuszony mulligan w 1. rundzie:
+			// dopóki gracz ma MulligansRemaining > 0,
+			// wolno mu tylko:
+			// - Mulligan
+			// - Resign
+			if (BoardState.CurrentRoundNumber == 1 &&
+				actingPlayer.MulligansRemaining > 0 &&
+				payload.ActionType != GameActionType.Mulligan &&
+				payload.ActionType != GameActionType.Resign)
+			{
+				return false;
+			}
+
+			return true;
+		}
+
 
 		#region Init / helpers
 

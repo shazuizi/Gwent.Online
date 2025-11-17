@@ -15,6 +15,8 @@ namespace Gwent.Server
 		private readonly ServerConfiguration serverConfiguration;
 		private readonly TcpListener tcpListener;
 		private readonly List<TcpClient> connectedClients = new List<TcpClient>();
+		private readonly Dictionary<TcpClient, PlayerIdentity> connectedPlayers = new();
+
 		private readonly CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
 
 		private GameSessionConfiguration currentGameSessionConfiguration = new GameSessionConfiguration();
@@ -154,6 +156,7 @@ namespace Gwent.Server
 			finally
 			{
 				connectedClients.Remove(client);
+				connectedPlayers.Remove(client); // czyścimy mapowanie gracza
 				client.Close();
 				Console.WriteLine("Client disconnected.");
 			}
@@ -176,7 +179,7 @@ namespace Gwent.Server
 					break;
 
 				case NetworkMessageType.GameAction:
-					await HandleGameActionAsync(networkMessage, cancellationToken);
+					await HandleGameActionAsync(client, networkMessage, cancellationToken);
 					break;
 
 				default:
@@ -215,6 +218,8 @@ namespace Gwent.Server
 				CurrentGameSessionConfiguration = currentGameSessionConfiguration,
 				AssignedRole = assignedRole
 			};
+
+			connectedPlayers[client] = joinPayload.JoiningPlayer;
 
 			NetworkMessage acceptedMessage = NetworkMessage.Create(NetworkMessageType.PlayerJoinAccepted, acceptedPayload);
 			await SendMessageToClientAsync(clientNetworkStream, acceptedMessage, cancellationToken);
@@ -269,6 +274,7 @@ namespace Gwent.Server
 		}
 
 		private async Task HandleGameActionAsync(
+			TcpClient client,
 			NetworkMessage networkMessage,
 			CancellationToken cancellationToken)
 		{
@@ -283,12 +289,27 @@ namespace Gwent.Server
 				return;
 			}
 
-			// stosujemy akcję
+			// Sprawdzamy, czy znamy tego klienta i jego tożsamość
+			if (!connectedPlayers.TryGetValue(client, out var playerIdentity))
+			{
+				Console.WriteLine("[Server] Received GameAction from unknown client.");
+				return;
+			}
+
+			// Twarde powiązanie: klient NIE może udawać innego nicku
+			if (!string.Equals(actionPayload.ActingPlayerNickname, playerIdentity.Nickname, StringComparison.Ordinal))
+			{
+				Console.WriteLine($"[Server] Spoofed action nickname '{actionPayload.ActingPlayerNickname}' from client mapped as '{playerIdentity.Nickname}'. Action rejected.");
+				return;
+			}
+
+			// Tu już tylko logika gry – cały mózg w GameEngine
 			gameEngine.ApplyGameAction(actionPayload);
 
-			// wysyłamy aktualny stan do wszystkich
+			// Wysyłamy aktualny stan do wszystkich
 			await BroadcastCurrentGameStateAsync(cancellationToken);
 		}
+
 
 		private async Task BroadcastCurrentGameStateAsync(CancellationToken cancellationToken)
 		{
