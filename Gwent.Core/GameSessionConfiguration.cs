@@ -1,13 +1,18 @@
 ﻿namespace Gwent.Core
 {
-	/// <summary>
-	/// Konfiguracja sesji gry – dane potrzebne obu stronom (host i guest).
-	/// </summary>
-	public class GameSessionConfiguration
+	public sealed class PlayerIdentity
 	{
-		public PlayerIdentity HostPlayer { get; set; } = new PlayerIdentity();
-		public PlayerIdentity GuestPlayer { get; set; } = new PlayerIdentity();
-		public int ServerPort { get; set; }
-		public string ServerAddress { get; set; } = "127.0.0.1";
+		public string Nickname { get; set; } = string.Empty;
+		public bool IsHost { get; set; }
+		public FactionType Faction { get; set; } = FactionType.NorthernRealms;
+	}
+
+	/// <summary>
+	/// Konfiguracja sesji – kto jest hostem, kto guestem, jakimi frakcjami grają.
+	/// </summary>
+	public sealed class GameSessionConfiguration
+	{
+		public PlayerIdentity HostPlayer { get; set; } = new();
+		public PlayerIdentity GuestPlayer { get; set; } = new();
 	}
 }

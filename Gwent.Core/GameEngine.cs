@@ -1,310 +1,182 @@
-﻿namespace Gwent.Core
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+
+namespace Gwent.Core
 {
-	public class GameEngine
+	/// <summary>
+	/// Silnik gry Gwint – pełna logika rund, kart i efektów.
+	/// Nie wie nic o UI / sieci – operuje tylko na GameActionPayload i GameBoardState.
+	/// </summary>
+	public sealed class GameEngine
 	{
-		private readonly Random random = new Random();
+		public GameBoardState BoardState { get; }
 
-		public GameBoardState BoardState { get; private set; } = new GameBoardState();
+		private readonly GameSessionConfiguration sessionConfig;
+		private readonly Random random = new();
 
-		public void InitializeNewGame(GameSessionConfiguration sessionConfiguration)
+		public GameEngine(GameSessionConfiguration sessionConfig)
 		{
-			BoardState = new GameBoardState
-			{
-				HostPlayerBoard = new PlayerBoardState
-				{
-					PlayerNickname = sessionConfiguration.HostPlayer.Nickname,
-					Faction = FactionType.NorthernRealms,
-					LifeTokensRemaining = 2,
-					RoundsWon = 0,
-					HasPassedCurrentRound = false,
-					MulligansRemaining = 2
-				},
-				GuestPlayerBoard = new PlayerBoardState
-				{
-					PlayerNickname = sessionConfiguration.GuestPlayer.Nickname,
-					Faction = FactionType.Nilfgaard,
-					LifeTokensRemaining = 2,
-					RoundsWon = 0,
-					HasPassedCurrentRound = false,
-					MulligansRemaining = 2
-				},
-				CurrentRoundNumber = 1,
-				IsGameFinished = false,
-				WinnerNickname = null,
-				WeatherCards = new List<GwentCard>()
-			};
+			this.sessionConfig = sessionConfig ?? throw new ArgumentNullException(nameof(sessionConfig));
+			BoardState = new GameBoardState();
 
-			BoardState.ActivePlayerNickname = DetermineStartingPlayerNickname();
+			// Inicjalizacja plansz graczy
+			InitializePlayers();
+			// Losujemy, kto zaczyna (uwzględniając Scoia'tael – wybór, ale uprośćmy: Scoia'tael startuje)
+			InitializeStartingPlayer();
 
-			BoardState.HostPlayerBoard.Deck = CreateSimpleTestDeck(BoardState.HostPlayerBoard.Faction, BoardState.HostPlayerBoard.PlayerNickname);
-			BoardState.GuestPlayerBoard.Deck = CreateSimpleTestDeck(BoardState.GuestPlayerBoard.Faction, BoardState.GuestPlayerBoard.PlayerNickname);
-
-			BoardState.HostPlayerBoard.LeaderCard = CreateLeaderCard(BoardState.HostPlayerBoard.Faction, BoardState.HostPlayerBoard.PlayerNickname);
-			BoardState.GuestPlayerBoard.LeaderCard = CreateLeaderCard(BoardState.GuestPlayerBoard.Faction, BoardState.GuestPlayerBoard.PlayerNickname);
-
-			ShuffleDeck(BoardState.HostPlayerBoard.Deck);
-			ShuffleDeck(BoardState.GuestPlayerBoard.Deck);
-
-			DrawFromDeck(BoardState.HostPlayerBoard, 10);
-			DrawFromDeck(BoardState.GuestPlayerBoard, 10);
-
+			RecalculateStrengths();
 			AddLogEntry("Game started.");
+		}
+
+		/// <summary>
+		/// Zwraca kopię stanu – do wysłania do klienta.
+		/// </summary>
+		public GameBoardState GetBoardStateSnapshot() => BoardState;
+
+		/// <summary>
+		/// Główna metoda – aplikuje akcję gracza do stanu gry.
+		/// </summary>
+		public void ApplyAction(GameActionPayload payload)
+		{
+			if (BoardState.IsGameFinished)
+				return;
+
+			if (!ValidateAction(payload, out var actingPlayer, out var opponent))
+				return;
+
+			switch (payload.ActionType)
+			{
+				case GameActionType.Mulligan:
+					ApplyMulliganAction(actingPlayer, payload.CardInstanceId);
+					break;
+
+				case GameActionType.PlayCard:
+					ApplyPlayCardAction(actingPlayer, opponent, payload);
+					break;
+
+				case GameActionType.PassTurn:
+					ApplyPassTurnAction(actingPlayer, opponent);
+					break;
+
+				case GameActionType.UseLeaderAbility:
+					ApplyLeaderAbilityAction(actingPlayer, payload.CardInstanceId);
+					break;
+
+				case GameActionType.Resign:
+					ApplyResignAction(actingPlayer, opponent);
+					break;
+			}
 
 			RecalculateStrengths();
 		}
 
-		public GameBoardState GetCurrentBoardStateSnapshot() => BoardState;
+		#region Inicjalizacja
 
-		public GameBoardState ApplyGameAction(GameActionPayload action)
+		private void InitializePlayers()
 		{
-			if (BoardState.IsGameFinished)
-				return BoardState;
+			var hostBoard = BoardState.HostPlayerBoard;
+			hostBoard.PlayerNickname = sessionConfig.HostPlayer.Nickname;
+			hostBoard.Faction = sessionConfig.HostPlayer.Faction;
+			hostBoard.Deck.AddRange(DeckFactory.CreateDeckInstances(hostBoard.Faction));
+			Shuffle(hostBoard.Deck);
+			DrawFromDeck(hostBoard, 10); // standardowo 10 kart na rękę
 
-			switch (action.ActionType)
-			{
-				case GameActionType.Mulligan:
-					ApplyMulliganAction(action);
-					break;
-
-				case GameActionType.PlayCard:
-					ApplyPlayCardAction(action);
-					break;
-
-				case GameActionType.PassTurn:
-					ApplyPassTurnAction(action);
-					break;
-
-				case GameActionType.Resign:
-					ApplyResignAction(action);
-					break;
-
-				case GameActionType.UseLeaderAbility:
-					ApplyLeaderAbilityAction(action);
-					break;
-			}
-
-			return BoardState;
+			var guestBoard = BoardState.GuestPlayerBoard;
+			guestBoard.PlayerNickname = sessionConfig.GuestPlayer.Nickname;
+			guestBoard.Faction = sessionConfig.GuestPlayer.Faction;
+			guestBoard.Deck.AddRange(DeckFactory.CreateDeckInstances(guestBoard.Faction));
+			Shuffle(guestBoard.Deck);
+			DrawFromDeck(guestBoard, 10);
 		}
 
-		#region Init / helpers
-
-		private string DetermineStartingPlayerNickname()
+		private void InitializeStartingPlayer()
 		{
 			var host = BoardState.HostPlayerBoard;
 			var guest = BoardState.GuestPlayerBoard;
 
-			if (host.Faction == FactionType.Scoiatael && guest.Faction != FactionType.Scoiatael)
-				return host.PlayerNickname;
+			// Scoia'tael mają bonus – mogą zdecydować, kto zaczyna.
+			// Na razie: jeśli dokładnie jeden z graczy jest Scoia'tael, on zaczyna.
+			bool hostScoia = host.Faction == FactionType.Scoiatael;
+			bool guestScoia = guest.Faction == FactionType.Scoiatael;
 
-			if (guest.Faction == FactionType.Scoiatael && host.Faction != FactionType.Scoiatael)
-				return guest.PlayerNickname;
-
-			return host.PlayerNickname;
+			if (hostScoia && !guestScoia)
+			{
+				BoardState.ActivePlayerNickname = host.PlayerNickname;
+				AddLogEntry("Scoia'tael bonus: host starts.");
+			}
+			else if (guestScoia && !hostScoia)
+			{
+				BoardState.ActivePlayerNickname = guest.PlayerNickname;
+				AddLogEntry("Scoia'tael bonus: guest starts.");
+			}
+			else
+			{
+				// losowo
+				var startHost = random.Next(2) == 0;
+				BoardState.ActivePlayerNickname = startHost ? host.PlayerNickname : guest.PlayerNickname;
+				AddLogEntry($"Random start player: {BoardState.ActivePlayerNickname}.");
+			}
 		}
 
-		private List<GwentCard> CreateSimpleTestDeck(FactionType faction, string ownerNickname)
+		#endregion
+
+		#region Walidacja / pomocnicze
+
+		private bool ValidateAction(
+			GameActionPayload payload,
+			out PlayerBoardState actingPlayer,
+			out PlayerBoardState opponent)
 		{
-			var deck = new List<GwentCard>();
+			actingPlayer = GetPlayerBoard(payload.ActingPlayerNickname);
+			opponent = GetOpponentBoard(payload.ActingPlayerNickname);
 
-			for (int i = 0; i < 3; i++)
+			if (actingPlayer == null || opponent == null)
+				return false;
+
+			// Tura – tylko aktywny gracz może grać (poza Resign)
+			if (payload.ActionType != GameActionType.Resign &&
+				payload.ActionType != GameActionType.Mulligan &&
+				BoardState.ActivePlayerNickname != actingPlayer.PlayerNickname)
 			{
-				deck.Add(new GwentCard
-				{
-					TemplateId = $"melee_basic_{faction}_{i}",
-					Name = $"{ownerNickname} Melee {i + 1}",
-					Faction = faction,
-					Category = CardCategory.Unit,
-					BaseStrength = 4 + (i % 3),
-					CurrentStrength = 4 + (i % 3),
-					DefaultRow = CardRow.Melee
-				});
+				// ignorujemy nielegalną akcję
+				return false;
 			}
 
-			for (int i = 0; i < 3; i++)
+			// Po passie nie można grać (poza Resign – teoretycznie i tak koniec gry)
+			if (payload.ActionType == GameActionType.PlayCard || payload.ActionType == GameActionType.PassTurn)
 			{
-				deck.Add(new GwentCard
-				{
-					TemplateId = $"tightbond_{faction}_{i}",
-					Name = $"{ownerNickname} Bond {i + 1}",
-					Faction = faction,
-					Category = CardCategory.Unit,
-					BaseStrength = 4,
-					CurrentStrength = 4,
-					DefaultRow = CardRow.Melee,
-					GroupId = "bond_group_1",
-					Abilities = { CardAbilityType.TightBond }
-				});
+				if (actingPlayer.HasPassedCurrentRound)
+					return false;
 			}
 
-			deck.Add(new GwentCard
-			{
-				TemplateId = $"spy_{faction}",
-				Name = $"{ownerNickname} Spy",
-				Faction = faction,
-				Category = CardCategory.Unit,
-				BaseStrength = 4,
-				CurrentStrength = 4,
-				DefaultRow = CardRow.Ranged,
-				Abilities = { CardAbilityType.Spy }
-			});
-
-			for (int i = 0; i < 3; i++)
-			{
-				deck.Add(new GwentCard
-				{
-					TemplateId = $"muster_{faction}_{i}",
-					Name = $"{ownerNickname} Muster {i + 1}",
-					Faction = faction,
-					Category = CardCategory.Unit,
-					BaseStrength = 2,
-					CurrentStrength = 2,
-					DefaultRow = CardRow.Melee,
-					GroupId = "muster_group_1",
-					Abilities = { CardAbilityType.Muster }
-				});
-			}
-
-			deck.Add(new GwentCard
-			{
-				TemplateId = $"morale_{faction}",
-				Name = $"{ownerNickname} Morale",
-				Faction = faction,
-				Category = CardCategory.Unit,
-				BaseStrength = 3,
-				CurrentStrength = 3,
-				DefaultRow = CardRow.Melee,
-				Abilities = { CardAbilityType.MoralBoost }
-			});
-
-			deck.Add(new GwentCard
-			{
-				TemplateId = $"horn_{faction}",
-				Name = $"{ownerNickname} Horn",
-				Faction = faction,
-				Category = CardCategory.Special,
-				BaseStrength = 0,
-				CurrentStrength = 0,
-				DefaultRow = CardRow.Melee,
-				Abilities = { CardAbilityType.CommandersHorn }
-			});
-
-			deck.Add(new GwentCard
-			{
-				TemplateId = $"scorch_{faction}",
-				Name = $"{ownerNickname} Scorch",
-				Faction = faction,
-				Category = CardCategory.Special,
-				BaseStrength = 0,
-				CurrentStrength = 0,
-				DefaultRow = CardRow.WeatherGlobal,
-				Abilities = { CardAbilityType.Scorch }
-			});
-
-			deck.Add(new GwentCard
-			{
-				TemplateId = $"frost_{faction}",
-				Name = "Biting Frost",
-				Faction = FactionType.Neutral,
-				Category = CardCategory.Weather,
-				BaseStrength = 0,
-				CurrentStrength = 0,
-				DefaultRow = CardRow.WeatherGlobal,
-				Abilities = { CardAbilityType.WeatherBitingFrost }
-			});
-
-			deck.Add(new GwentCard
-			{
-				TemplateId = $"fog_{faction}",
-				Name = "Impenetrable Fog",
-				Faction = FactionType.Neutral,
-				Category = CardCategory.Weather,
-				BaseStrength = 0,
-				CurrentStrength = 0,
-				DefaultRow = CardRow.WeatherGlobal,
-				Abilities = { CardAbilityType.WeatherImpenetrableFog }
-			});
-
-			deck.Add(new GwentCard
-			{
-				TemplateId = $"rain_{faction}",
-				Name = "Torrential Rain",
-				Faction = FactionType.Neutral,
-				Category = CardCategory.Weather,
-				BaseStrength = 0,
-				CurrentStrength = 0,
-				DefaultRow = CardRow.WeatherGlobal,
-				Abilities = { CardAbilityType.WeatherTorrentialRain }
-			});
-
-			deck.Add(new GwentCard
-			{
-				TemplateId = $"clear_{faction}",
-				Name = "Clear Weather",
-				Faction = FactionType.Neutral,
-				Category = CardCategory.Weather,
-				BaseStrength = 0,
-				CurrentStrength = 0,
-				DefaultRow = CardRow.WeatherGlobal,
-				Abilities = { CardAbilityType.ClearWeather }
-			});
-
-			deck.Add(new GwentCard
-			{
-				TemplateId = $"decoy_{faction}",
-				Name = "Decoy",
-				Faction = FactionType.Neutral,
-				Category = CardCategory.Special,
-				BaseStrength = 0,
-				CurrentStrength = 0,
-				DefaultRow = CardRow.Melee,
-				Abilities = { CardAbilityType.Decoy }
-			});
-
-			deck.Add(new GwentCard
-			{
-				TemplateId = $"mardroeme_{faction}",
-				Name = "Mardroeme",
-				Faction = FactionType.Neutral,
-				Category = CardCategory.Special,
-				BaseStrength = 0,
-				CurrentStrength = 0,
-				DefaultRow = CardRow.Melee,
-				Abilities = { CardAbilityType.Mardroeme }
-			});
-
-			return deck;
+			return true;
 		}
 
-		private GwentCard CreateLeaderCard(FactionType faction, string ownerNickname)
+		private PlayerBoardState GetPlayerBoard(string nickname)
 		{
-			var leader = new GwentCard
-			{
-				TemplateId = $"leader_{faction}",
-				Name = $"{ownerNickname} Leader",
-				Faction = faction,
-				Category = CardCategory.Leader,
-				BaseStrength = 0,
-				CurrentStrength = 0,
-				DefaultRow = CardRow.WeatherGlobal,
-				IsHero = true,
-				Abilities = new List<CardAbilityType>()
-			};
-
-			if (faction == FactionType.NorthernRealms)
-			{
-				// prosty przykład – NR leader dobiera 1 kartę
-				leader.Abilities.Add(CardAbilityType.LeaderAbility_DrawExtraCard);
-			}
-
-			return leader;
+			if (BoardState.HostPlayerBoard.PlayerNickname == nickname)
+				return BoardState.HostPlayerBoard;
+			if (BoardState.GuestPlayerBoard.PlayerNickname == nickname)
+				return BoardState.GuestPlayerBoard;
+			throw new InvalidOperationException($"Unknown player nickname: {nickname}");
 		}
 
-		private void ShuffleDeck(List<GwentCard> deck)
+		private PlayerBoardState GetOpponentBoard(string nickname)
 		{
-			for (int i = deck.Count - 1; i > 0; i--)
+			if (BoardState.HostPlayerBoard.PlayerNickname == nickname)
+				return BoardState.GuestPlayerBoard;
+			if (BoardState.GuestPlayerBoard.PlayerNickname == nickname)
+				return BoardState.HostPlayerBoard;
+			throw new InvalidOperationException($"Unknown player nickname: {nickname}");
+		}
+
+		private void Shuffle<T>(IList<T> list)
+		{
+			for (int i = list.Count - 1; i > 0; i--)
 			{
-				int swapIndex = random.Next(i + 1);
-				(deck[i], deck[swapIndex]) = (deck[swapIndex], deck[i]);
+				int j = random.Next(i + 1);
+				(list[i], list[j]) = (list[j], list[i]);
 			}
 		}
 
@@ -312,379 +184,380 @@
 		{
 			for (int i = 0; i < count && player.Deck.Count > 0; i++)
 			{
-				var top = player.Deck[0];
+				var card = player.Deck[0];
 				player.Deck.RemoveAt(0);
-				player.Hand.Add(top);
+				player.Hand.Add(card);
 			}
 		}
-
-		private PlayerBoardState GetPlayerBoard(string nickname)
-		{
-			if (BoardState.HostPlayerBoard.PlayerNickname == nickname)
-				return BoardState.HostPlayerBoard;
-			return BoardState.GuestPlayerBoard;
-		}
-
-		private PlayerBoardState GetOpponentBoard(string nickname)
-		{
-			if (BoardState.HostPlayerBoard.PlayerNickname == nickname)
-				return BoardState.GuestPlayerBoard;
-			return BoardState.HostPlayerBoard;
-		}
-
-		#endregion Init / helpers
-
-		#region LogEntry
 
 		private void AddLogEntry(string message)
 		{
-			if (BoardState.GameLog == null)
-			{
-				BoardState.GameLog = new List<string>();
-			}
-
+			BoardState.GameLog ??= new List<string>();
 			BoardState.GameLog.Add(message);
-
-			// prosta rotacja – max 200 wpisów
 			if (BoardState.GameLog.Count > 200)
-			{
 				BoardState.GameLog.RemoveAt(0);
-			}
 		}
 
-		#endregion LogEntry
+		#endregion
 
-		#region Mulligan
+		#region Akcje
 
-		private void ApplyMulliganAction(GameActionPayload action)
+		/// <summary>
+		/// Mulligan – w 1. rundzie każdy gracz ma np. 2 wymiany.
+		/// </summary>
+		private void ApplyMulliganAction(PlayerBoardState actingPlayer, Guid cardInstanceId)
 		{
-			// Mulligan tylko w 1 rundzie.
-			if (BoardState.CurrentRoundNumber != 1)
-			{
-				return;
-			}
-
-			var player = GetPlayerBoard(action.ActingPlayerNickname);
-			if (player.MulligansRemaining <= 0 || action.CardInstanceId == null)
-			{
-				return;
-			}
-
-			var card = player.Hand.FirstOrDefault(c => c.InstanceId == action.CardInstanceId);
-			if (card == null || player.Deck.Count == 0)
-			{
-				return;
-			}
-
-			// wrzucamy kartę z ręki losowo do talii
-			player.Hand.Remove(card);
-			int insertIndex = random.Next(player.Deck.Count + 1);
-			player.Deck.Insert(insertIndex, card);
-
-			// dobieramy nową
-			DrawFromDeck(player, 1);
-
-			player.MulligansRemaining--;
-
-			RecalculateStrengths();
-			AddLogEntry($"{player.PlayerNickname} mulliganed {card.Name}.");
-		}
-
-		#endregion Mulligan
-
-		#region Play card + targeted abilities
-
-		private void ApplyPlayCardAction(GameActionPayload action)
-		{
-			var actingPlayer = GetPlayerBoard(action.ActingPlayerNickname);
-			var opponent = GetOpponentBoard(action.ActingPlayerNickname);
-
-			if (BoardState.CurrentRoundNumber == 1 && actingPlayer.MulligansRemaining > 0)
-			{
-				return;
-			}
-
-			if (actingPlayer.HasPassedCurrentRound)
+			if (BoardState.CurrentRoundNumber != 1 || actingPlayer.MulligansRemaining <= 0)
 				return;
 
-			if (action.CardInstanceId == null)
-				return;
-
-			var card = actingPlayer.Hand.FirstOrDefault(c => c.InstanceId == action.CardInstanceId);
+			var card = actingPlayer.Hand.FirstOrDefault(c => c.InstanceId == cardInstanceId);
 			if (card == null)
 				return;
 
 			actingPlayer.Hand.Remove(card);
+			actingPlayer.Deck.Add(card);
+			Shuffle(actingPlayer.Deck);
+			DrawFromDeck(actingPlayer, 1);
 
+			actingPlayer.MulligansRemaining--;
+			AddLogEntry($"{actingPlayer.PlayerNickname} mulliganed {card.Name}.");
+		}
+
+		/// <summary>
+		/// Główna akcja – zagranie karty (jednostki, specjalnej, pogody, itp.).
+		/// </summary>
+		private void ApplyPlayCardAction(
+			PlayerBoardState actingPlayer,
+			PlayerBoardState opponent,
+			GameActionPayload payload)
+		{
+			// karta może być w ręce (normalnie) albo lider (LeaderAbility też idzie przez tę metodę, ale tam inny path)
+			var card = actingPlayer.Hand.FirstOrDefault(c => c.InstanceId == payload.CardInstanceId);
+			if (card == null)
+			{
+				// może to lider? – ten idziemy inną ścieżką
+				return;
+			}
+
+			actingPlayer.Hand.Remove(card);
+
+			// Specjalne karty pogody / ClearWeather / globalny Scorch:
+			if (card.Category == CardCategory.Weather ||
+				(card.Category == CardCategory.Special &&
+				 (card.HasAbility(CardAbilityType.Scorch) ||
+				  card.HasAbility(CardAbilityType.ClearWeather))))
+			{
+				ApplyGlobalSpecialCard(actingPlayer, opponent, card);
+				SwitchTurnToOpponent(actingPlayer.PlayerNickname);
+				return;
+			}
+
+			// Spy – kładziemy zawsze na rząd przeciwnika
 			if (card.HasAbility(CardAbilityType.Spy))
 			{
-				PlaceUnitOnRow(card, opponent, card.DefaultRow, action.TargetRow);
-				DrawFromDeck(actingPlayer, 2);
-			}
-			else if (card.Category == CardCategory.Weather &&
-					 (card.HasAbility(CardAbilityType.WeatherBitingFrost) ||
-					  card.HasAbility(CardAbilityType.WeatherImpenetrableFog) ||
-					  card.HasAbility(CardAbilityType.WeatherTorrentialRain)))
-			{
-				BoardState.WeatherCards.Add(card);
-			}
-			else if (card.HasAbility(CardAbilityType.ClearWeather))
-			{
-				BoardState.WeatherCards.Clear();
-				actingPlayer.Graveyard.Add(card);
-			}
-			else if (card.HasAbility(CardAbilityType.Decoy))
-			{
-				ApplyDecoyEffect(actingPlayer, card, action.TargetInstanceId);
-			}
-			else if (card.HasAbility(CardAbilityType.Mardroeme))
-			{
-				ApplyMardroemeEffect(actingPlayer, card, action.TargetInstanceId);
-			}
-			else if (card.HasAbility(CardAbilityType.Scorch) && card.Category == CardCategory.Special)
-			{
-				ApplyScorchEffectGlobal();
-				actingPlayer.Graveyard.Add(card);
-			}
-			else
-			{
-				PlaceUnitOnRow(card, actingPlayer, card.DefaultRow, action.TargetRow);
-
-				if (card.HasAbility(CardAbilityType.Muster))
-					ApplyMusterEffect(actingPlayer, card);
-
-				if (card.HasAbility(CardAbilityType.Medic))
-					ApplyMedicEffect(actingPlayer, card, action.TargetInstanceId);
+				var row = payload.TargetRow ?? card.DefaultRow;
+				PlaceCardOnRow(opponent, card, row);
+				ApplySpyBonusDraw(actingPlayer);
+				AddLogEntry($"{actingPlayer.PlayerNickname} played Spy {card.Name} on opponent row {row}.");
+				SwitchTurnToOpponent(actingPlayer.PlayerNickname);
+				return;
 			}
 
-			RecalculateStrengths();
-			AddLogEntry($"{actingPlayer.PlayerNickname} played {card.Name}.");
+			// Medic – wymaga TargetInstanceId z cmentarza
+			if (card.HasAbility(CardAbilityType.Medic))
+			{
+				var targetId = payload.TargetInstanceId;
+				if (targetId == null)
+				{
+					// klient powinien zawsze podać cel
+					actingPlayer.Graveyard.Add(card); // karta zmarnowana
+					AddLogEntry($"{actingPlayer.PlayerNickname} played Medic {card.Name} without target (wasted).");
+				}
+				else
+				{
+					var revived = actingPlayer.Graveyard
+						.FirstOrDefault(c => c.InstanceId == targetId.Value && c.Category == CardCategory.Unit && !c.IsHero);
+					if (revived != null)
+					{
+						actingPlayer.Graveyard.Remove(revived);
+
+						var row = payload.TargetRow ?? revived.DefaultRow;
+						PlaceCardOnRow(actingPlayer, revived, row);
+						AddLogEntry($"{actingPlayer.PlayerNickname} revived {revived.Name} with Medic {card.Name}.");
+					}
+
+					// Medic sam wchodzi na wybrany rząd
+					var medicRow = payload.TargetRow ?? card.DefaultRow;
+					PlaceCardOnRow(actingPlayer, card, medicRow);
+				}
+
+				SwitchTurnToOpponent(actingPlayer.PlayerNickname);
+				return;
+			}
+
+			// Decoy/Mardroeme – target InstanceId z planszy
+			if (card.HasAbility(CardAbilityType.Decoy))
+			{
+				ApplyDecoy(actingPlayer, payload, card);
+				SwitchTurnToOpponent(actingPlayer.PlayerNickname);
+				return;
+			}
+
+			if (card.HasAbility(CardAbilityType.Mardroeme))
+			{
+				ApplyMardroeme(actingPlayer, payload, card);
+				SwitchTurnToOpponent(actingPlayer.PlayerNickname);
+				return;
+			}
+
+			// Normalne jednostki / rogi / morale / TightBond / Muster / Agile
+			var targetRow = payload.TargetRow ?? card.DefaultRow;
+			PlaceCardOnRow(actingPlayer, card, targetRow);
+
+			// Muster – dobijamy wszystkie kopie z decku/hand
+			if (card.HasAbility(CardAbilityType.Muster) && !string.IsNullOrEmpty(card.MusterGroup))
+			{
+				ApplyMuster(actingPlayer, card.MusterGroup, targetRow);
+			}
+
+			// TightBond / MoralBoost / Horn / Agile itd. – ich efekty są uwzględniane w RecalculateStrengths()
+			AddLogEntry($"{actingPlayer.PlayerNickname} played {card.Name} on row {targetRow}.");
+
 			SwitchTurnToOpponent(actingPlayer.PlayerNickname);
 		}
 
-		private void PlaceUnitOnRow(GwentCard card, PlayerBoardState owner, CardRow defaultRow, CardRow? chosenRow)
+		/// <summary>
+		/// Gracz pasuje – gdy obaj spasują, kończymy rundę.
+		/// </summary>
+		private void ApplyPassTurnAction(PlayerBoardState actingPlayer, PlayerBoardState opponent)
 		{
-			CardRow row = defaultRow;
-			if (card.HasAbility(CardAbilityType.Agile) && chosenRow.HasValue)
-				row = chosenRow.Value;
+			actingPlayer.HasPassedCurrentRound = true;
+			AddLogEntry($"{actingPlayer.PlayerNickname} passed.");
 
-			var rowList = row switch
-			{
-				CardRow.Melee => owner.MeleeRow,
-				CardRow.Ranged => owner.RangedRow,
-				CardRow.Siege => owner.SiegeRow,
-				_ => owner.MeleeRow
-			};
-
-			rowList.Add(card);
-		}
-
-		private void ApplyMusterEffect(PlayerBoardState player, GwentCard sourceCard)
-		{
-			if (string.IsNullOrEmpty(sourceCard.GroupId))
-				return;
-
-			var mustersFromHand = player.Hand
-				.Where(c => c.GroupId == sourceCard.GroupId && c.TemplateId == sourceCard.TemplateId)
-				.ToList();
-
-			foreach (var card in mustersFromHand)
-			{
-				player.Hand.Remove(card);
-				PlaceUnitOnRow(card, player, card.DefaultRow, null);
-			}
-
-			var mustersFromDeck = player.Deck
-				.Where(c => c.GroupId == sourceCard.GroupId && c.TemplateId == sourceCard.TemplateId)
-				.ToList();
-
-			foreach (var card in mustersFromDeck)
-			{
-				player.Deck.Remove(card);
-				PlaceUnitOnRow(card, player, card.DefaultRow, null);
-			}
-		}
-
-		private void ApplyMedicEffect(PlayerBoardState player, GwentCard medicCard, string? targetInstanceId)
-		{
-			GwentCard? candidate = null;
-
-			if (!string.IsNullOrEmpty(targetInstanceId))
-			{
-				candidate = player.Graveyard
-					.FirstOrDefault(c => c.InstanceId == targetInstanceId &&
-										 c.Category == CardCategory.Unit &&
-										 !c.IsHero);
-			}
-
-			if (candidate == null)
-			{
-				candidate = player.Graveyard
-					.Where(c => c.Category == CardCategory.Unit && !c.IsHero)
-					.OrderByDescending(c => c.BaseStrength)
-					.FirstOrDefault();
-			}
-
-			if (candidate == null)
-				return;
-
-			player.Graveyard.Remove(candidate);
-			PlaceUnitOnRow(candidate, player, medicCard.DefaultRow, null);
-		}
-
-		private void ApplyDecoyEffect(PlayerBoardState player, GwentCard decoy, string? targetInstanceId)
-		{
-			var allRows = new[]
-			{
-				(row: CardRow.Melee,  list: player.MeleeRow),
-				(row: CardRow.Ranged, list: player.RangedRow),
-				(row: CardRow.Siege,  list: player.SiegeRow)
-			};
-
-			(GwentCard card, CardRow row, List<GwentCard> list)? target = null;
-
-			if (!string.IsNullOrEmpty(targetInstanceId))
-			{
-				foreach (var t in allRows)
-				{
-					var c = t.list.FirstOrDefault(x => x.InstanceId == targetInstanceId &&
-													   x.Category == CardCategory.Unit &&
-													   !x.IsHero);
-					if (c != null)
-					{
-						target = (c, t.row, t.list);
-						break;
-					}
-				}
-			}
-
-			if (target == null)
-			{
-				var unitsOnBoard = allRows
-					.SelectMany(t => t.list.Select(c => (card: c, row: t.row, list: t.list)))
-					.Where(x => x.card.Category == CardCategory.Unit && !x.card.IsHero)
-					.ToList();
-
-				if (!unitsOnBoard.Any())
-				{
-					player.Graveyard.Add(decoy);
-					return;
-				}
-
-				target = unitsOnBoard.OrderByDescending(x => x.card.CurrentStrength).First();
-			}
-
-			var chosen = target.Value;
-
-			chosen.list.Remove(chosen.card);
-			player.Hand.Add(chosen.card);
-
-			chosen.list.Add(decoy);
-		}
-
-		private void ApplyMardroemeEffect(PlayerBoardState player, GwentCard mardroemeCard, string? targetInstanceId)
-		{
-			GwentCard? target = null;
-
-			var allUnits = player.MeleeRow
-				.Concat(player.RangedRow)
-				.Concat(player.SiegeRow)
-				.Where(c => c.Category == CardCategory.Unit && !c.IsHero);
-
-			if (!string.IsNullOrEmpty(targetInstanceId))
-			{
-				target = allUnits.FirstOrDefault(c => c.InstanceId == targetInstanceId);
-			}
-
-			if (target == null)
-			{
-				target = allUnits.OrderByDescending(c => c.CurrentStrength).FirstOrDefault();
-			}
-
-			if (target == null)
-			{
-				player.Graveyard.Add(mardroemeCard);
-				return;
-			}
-
-			target.BaseStrength = 13;
-			player.Graveyard.Add(mardroemeCard);
-		}
-
-		#endregion Play card + targeted abilities
-
-		#region Pass / Resign / Leader
-
-		private void ApplyPassTurnAction(GameActionPayload action)
-		{
-			var player = GetPlayerBoard(action.ActingPlayerNickname);
-
-			if (BoardState.CurrentRoundNumber == 1 && player.MulligansRemaining > 0)
-			{
-				// nie możesz passować zanim nie wymienisz 2 kart
-				return;
-			}
-
-			if (player.HasPassedCurrentRound)
-				return;
-
-			player.HasPassedCurrentRound = true;
-			AddLogEntry($"{player.PlayerNickname} passed.");
-
-			var opponent = GetOpponentBoard(action.ActingPlayerNickname);
-
-			if (opponent.HasPassedCurrentRound)
+			if (actingPlayer.HasPassedCurrentRound && opponent.HasPassedCurrentRound)
 			{
 				EndRound();
 			}
 			else
 			{
-				SwitchTurnToOpponent(player.PlayerNickname);
+				SwitchTurnToOpponent(actingPlayer.PlayerNickname);
 			}
 		}
 
-		private void ApplyResignAction(GameActionPayload action)
+		/// <summary>
+		/// Dowódca używa zdolności.
+		/// </summary>
+		private void ApplyLeaderAbilityAction(PlayerBoardState actingPlayer, Guid leaderInstanceId)
 		{
-			var player = GetPlayerBoard(action.ActingPlayerNickname);
-
-			if (BoardState.CurrentRoundNumber == 1 && player.MulligansRemaining > 0)
-			{
-				// możesz wymusić też, że nie wolno się poddać w fazie mulliganu
+			if (actingPlayer.LeaderCard == null ||
+				actingPlayer.LeaderAbilityUsed ||
+				actingPlayer.LeaderCard.InstanceId != leaderInstanceId)
 				return;
+
+			// przykład: LeaderAbility_DrawExtraCard
+			if (actingPlayer.LeaderCard.HasAbility(CardAbilityType.LeaderAbility_DrawExtraCard))
+			{
+				DrawFromDeck(actingPlayer, 1);
+				AddLogEntry($"{actingPlayer.PlayerNickname} used leader ability (draw extra card).");
 			}
 
-			var opponent = GetOpponentBoard(action.ActingPlayerNickname);
+			actingPlayer.LeaderAbilityUsed = true;
+			SwitchTurnToOpponent(actingPlayer.PlayerNickname);
+		}
 
+		/// <summary>
+		/// Poddanie gry – natychmiastowy koniec.
+		/// </summary>
+		private void ApplyResignAction(PlayerBoardState actingPlayer, PlayerBoardState opponent)
+		{
 			BoardState.IsGameFinished = true;
 			BoardState.WinnerNickname = opponent.PlayerNickname;
-			AddLogEntry($"{player.PlayerNickname} surrendered. {opponent.PlayerNickname} wins the game.");
-			player.LifeTokensRemaining = 0;
+			AddLogEntry($"{actingPlayer.PlayerNickname} surrendered. {opponent.PlayerNickname} wins the game.");
 		}
 
-		private void ApplyLeaderAbilityAction(GameActionPayload action)
+		#endregion
+
+		#region Efekty kart
+
+		private void ApplyGlobalSpecialCard(PlayerBoardState actingPlayer, PlayerBoardState opponent, GwentCard card)
 		{
-			var player = GetPlayerBoard(action.ActingPlayerNickname);
-
-			if (BoardState.CurrentRoundNumber == 1 && player.MulligansRemaining > 0)
+			if (card.HasAbility(CardAbilityType.ClearWeather))
 			{
-				// najpierw wykorzystaj mulligany
+				BoardState.WeatherCards.Clear();
+				AddLogEntry($"{actingPlayer.PlayerNickname} played Clear Weather.");
 				return;
 			}
 
-			if (player.LeaderCard == null || player.LeaderAbilityUsed)
-				return;
-
-			var leader = player.LeaderCard;
-
-			if (leader.HasAbility(CardAbilityType.LeaderAbility_DrawExtraCard))
+			if (card.HasAbility(CardAbilityType.Scorch))
 			{
-				DrawFromDeck(player, 1);
+				ApplyGlobalScorch(actingPlayer, opponent);
+				AddLogEntry($"{actingPlayer.PlayerNickname} played Scorch.");
+				return;
 			}
 
-			player.LeaderAbilityUsed = true;
-			RecalculateStrengths();
-			AddLogEntry($"{player.PlayerNickname} used leader ability {leader.Name}.");
-			SwitchTurnToOpponent(player.PlayerNickname);
+			// Biting Frost / Fog / Rain – pogoda
+			BoardState.WeatherCards.Add(card);
+			AddLogEntry($"{actingPlayer.PlayerNickname} played weather: {card.Name}.");
+		}
+
+		private void ApplyGlobalScorch(PlayerBoardState actingPlayer, PlayerBoardState opponent)
+		{
+			// Scorch: usuwa najsilniejsze jednostki (nie hero) z planszy obu graczy
+			var allUnits = actingPlayer.EnumerateBoardCards()
+				.Concat(opponent.EnumerateBoardCards())
+				.Where(c => c.Category == CardCategory.Unit && !c.IsHero)
+				.ToList();
+
+			if (!allUnits.Any())
+				return;
+
+			int maxStrength = allUnits.Max(c => c.CurrentStrength);
+
+			var toDestroy = allUnits.Where(c => c.CurrentStrength == maxStrength).ToList();
+
+			RemoveCardsFromBoardToGraveyard(actingPlayer, toDestroy);
+			RemoveCardsFromBoardToGraveyard(opponent, toDestroy);
+		}
+
+		private void ApplySpyBonusDraw(PlayerBoardState actingPlayer)
+		{
+			DrawFromDeck(actingPlayer, 2);
+		}
+
+		private void ApplyMuster(PlayerBoardState actingPlayer, string musterGroup, CardRow row)
+		{
+			// wszystkie karty z musterGroup z ręki i decku
+			var fromHand = actingPlayer.Hand.Where(c => c.MusterGroup == musterGroup).ToList();
+			var fromDeck = actingPlayer.Deck.Where(c => c.MusterGroup == musterGroup).ToList();
+
+			foreach (var c in fromHand)
+			{
+				actingPlayer.Hand.Remove(c);
+				PlaceCardOnRow(actingPlayer, c, row);
+			}
+
+			foreach (var c in fromDeck)
+			{
+				actingPlayer.Deck.Remove(c);
+				PlaceCardOnRow(actingPlayer, c, row);
+			}
+
+			if (fromHand.Count + fromDeck.Count > 0)
+			{
+				AddLogEntry($"{actingPlayer.PlayerNickname}'s Muster pulled {fromHand.Count + fromDeck.Count} additional cards.");
+			}
+		}
+
+		private void ApplyDecoy(PlayerBoardState actingPlayer, GameActionPayload payload, GwentCard decoyCard)
+		{
+			if (payload.TargetInstanceId == null)
+			{
+				actingPlayer.Graveyard.Add(decoyCard);
+				AddLogEntry($"{actingPlayer.PlayerNickname} played Decoy {decoyCard.Name} without target.");
+				return;
+			}
+
+			var targetId = payload.TargetInstanceId.Value;
+
+			var (rowList, targetCard) = FindBoardCardByInstanceId(actingPlayer, targetId);
+			if (rowList == null || targetCard == null)
+			{
+				actingPlayer.Graveyard.Add(decoyCard);
+				AddLogEntry($"{actingPlayer.PlayerNickname} played Decoy {decoyCard.Name} with invalid target.");
+				return;
+			}
+
+			rowList.Remove(targetCard);
+			actingPlayer.Hand.Add(targetCard);
+
+			// Decoy idzie na miejsce jednostki
+			rowList.Add(decoyCard);
+			decoyCard.IsOnBoard = true;
+
+			AddLogEntry($"{actingPlayer.PlayerNickname} used Decoy on {targetCard.Name}.");
+		}
+
+		private void ApplyMardroeme(PlayerBoardState actingPlayer, GameActionPayload payload, GwentCard mardroemeCard)
+		{
+			if (payload.TargetInstanceId == null)
+			{
+				actingPlayer.Graveyard.Add(mardroemeCard);
+				AddLogEntry($"{actingPlayer.PlayerNickname} played Mardroeme {mardroemeCard.Name} without target.");
+				return;
+			}
+
+			var targetId = payload.TargetInstanceId.Value;
+
+			var (rowList, targetCard) = FindBoardCardByInstanceId(actingPlayer, targetId);
+			if (rowList == null || targetCard == null)
+			{
+				actingPlayer.Graveyard.Add(mardroemeCard);
+				AddLogEntry($"{actingPlayer.PlayerNickname} played Mardroeme {mardroemeCard.Name} with invalid target.");
+				return;
+			}
+
+			// W W3 Mardroeme buffuje/bije, zależnie od karty – tu na razie proste +X
+			targetCard.CurrentStrength += 2;
+			actingPlayer.Graveyard.Add(mardroemeCard);
+
+			AddLogEntry($"{actingPlayer.PlayerNickname} used Mardroeme on {targetCard.Name} (+2 strength).");
+		}
+
+		private (List<GwentCard>? rowList, GwentCard? card) FindBoardCardByInstanceId(PlayerBoardState player, Guid instanceId)
+		{
+			foreach (var row in new[]
+					 {
+						 player.MeleeRow,
+						 player.RangedRow,
+						 player.SiegeRow
+					 })
+			{
+				var card = row.FirstOrDefault(c => c.InstanceId == instanceId);
+				if (card != null)
+					return (row, card);
+			}
+
+			return (null, null);
+		}
+
+		private void PlaceCardOnRow(PlayerBoardState player, GwentCard card, CardRow row)
+		{
+			List<GwentCard> targetRow = row switch
+			{
+				CardRow.Melee => player.MeleeRow,
+				CardRow.Ranged => player.RangedRow,
+				CardRow.Siege => player.SiegeRow,
+				_ => player.MeleeRow
+			};
+
+			targetRow.Add(card);
+			card.IsOnBoard = true;
+		}
+
+		private void RemoveCardsFromBoardToGraveyard(PlayerBoardState player, IEnumerable<GwentCard> cards)
+		{
+			var set = new HashSet<Guid>(cards.Select(c => c.InstanceId));
+
+			player.MeleeRow.RemoveAll(c => set.Contains(c.InstanceId) && MoveToGrave(player, c));
+			player.RangedRow.RemoveAll(c => set.Contains(c.InstanceId) && MoveToGrave(player, c));
+			player.SiegeRow.RemoveAll(c => set.Contains(c.InstanceId) && MoveToGrave(player, c));
+		}
+
+		private bool MoveToGrave(PlayerBoardState player, GwentCard card)
+		{
+			card.IsOnBoard = false;
+			player.Graveyard.Add(card);
+			return true;
+		}
+
+		#endregion
+
+		#region Runda / tura
+
+		private void SwitchTurnToOpponent(string currentPlayerNickname)
+		{
+			var next = GetOpponentBoard(currentPlayerNickname);
+			BoardState.ActivePlayerNickname = next.PlayerNickname;
 		}
 
 		private void EndRound()
@@ -701,7 +574,6 @@
 			PlayerBoardState? roundLoser = null;
 			bool isTrueDraw = false;
 
-			// 1) Ustalamy zwycięzcę rundy na podstawie siły
 			if (hostStrength > guestStrength)
 			{
 				roundWinner = host;
@@ -714,58 +586,47 @@
 			}
 			else
 			{
-				// 2) Remis siły – sprawdzamy bonus Nilfgaardu
 				bool hostIsNg = host.Faction == FactionType.Nilfgaard;
 				bool guestIsNg = guest.Faction == FactionType.Nilfgaard;
 
 				if (hostIsNg && !guestIsNg)
 				{
-					// host = Nilfgaard → wygrywa remis
 					roundWinner = host;
 					roundLoser = guest;
 				}
 				else if (guestIsNg && !hostIsNg)
 				{
-					// guest = Nilfgaard → wygrywa remis
 					roundWinner = guest;
 					roundLoser = host;
 				}
 				else
 				{
-					// 3) Prawdziwy remis – żadna strona (albo obie) nie ma przewagi Nilfgaardu
 					isTrueDraw = true;
 				}
 			}
 
-			// 4) Obsługa prawdziwego remisu rundy (bez Nilfgaardu)
 			if (isTrueDraw)
 			{
-				// Obie strony „przegrywają” po 1 życiu
 				host.LifeTokensRemaining--;
 				guest.LifeTokensRemaining--;
-
 				host.RoundsWon++;
 				guest.RoundsWon++;
 
-				AddLogEntry($"Round {BoardState.CurrentRoundNumber} ended in a draw. " +
-							$"Host: {hostStrength}, Guest: {guestStrength}. " +
-							$"Lives after draw – Host: {host.LifeTokensRemaining}, Guest: {guest.LifeTokensRemaining}.");
+				AddLogEntry($"Round {BoardState.CurrentRoundNumber} ended in a draw. Host: {hostStrength}, Guest: {guestStrength}.");
 
-				// 4a) Obaj mają 0 → remis całej gry
+				// pełny remis gry?
 				if (host.LifeTokensRemaining <= 0 && guest.LifeTokensRemaining <= 0)
 				{
 					BoardState.IsGameFinished = true;
 					BoardState.WinnerNickname = null;
 					AddLogEntry("Game ended in a full draw (both players lost their last life).");
 				}
-				// 4b) Host padł, Guest żyje → Guest wygrywa
 				else if (host.LifeTokensRemaining <= 0 && guest.LifeTokensRemaining > 0)
 				{
 					BoardState.IsGameFinished = true;
 					BoardState.WinnerNickname = guest.PlayerNickname;
 					AddLogEntry($"Game won by {guest.PlayerNickname} (host lost last life in draw round).");
 				}
-				// 4c) Guest padł, Host żyje → Host wygrywa
 				else if (guest.LifeTokensRemaining <= 0 && host.LifeTokensRemaining > 0)
 				{
 					BoardState.IsGameFinished = true;
@@ -773,7 +634,6 @@
 					AddLogEntry($"Game won by {host.PlayerNickname} (guest lost last life in draw round).");
 				}
 			}
-			// 5) Normalna sytuacja – ktoś wygrał rundę
 			else if (roundWinner != null && roundLoser != null)
 			{
 				roundWinner.RoundsWon++;
@@ -783,14 +643,19 @@
 							$"Host: {hostStrength}, Guest: {guestStrength}. " +
 							$"Loser lives left: {roundLoser.LifeTokensRemaining}.");
 
-				// Northern Realms bonus – po WYGRANEJ rundzie dobiera kartę
+				// Northern Realms – dobiera kartę po wygranej rundzie
 				if (roundWinner.Faction == FactionType.NorthernRealms)
 				{
 					DrawFromDeck(roundWinner, 1);
 					AddLogEntry($"{roundWinner.PlayerNickname} draws a card due to Northern Realms bonus.");
 				}
 
-				// czy przegrany stracił ostatnie życie?
+				// Monsters – jedna losowa jednostka zostaje na planszy
+				if (roundWinner.Faction == FactionType.Monsters)
+				{
+					KeepRandomMonsterUnitOnBoard(roundWinner);
+				}
+
 				if (roundLoser.LifeTokensRemaining <= 0)
 				{
 					BoardState.IsGameFinished = true;
@@ -799,211 +664,163 @@
 				}
 			}
 
-			// 6) Koniec rundy – czyścimy rzędy, pogodę, passy, zwiększamy nr rundy
+			// Czyścimy rzędy, pogodę, passy, zwiększamy nr rundy
 			ClearRows(host);
 			ClearRows(guest);
-
 			host.HasPassedCurrentRound = false;
 			guest.HasPassedCurrentRound = false;
-
 			BoardState.WeatherCards.Clear();
 			BoardState.CurrentRoundNumber++;
 
-			// Nowa runda – jeśli gra jeszcze trwa, zaczyna host (prosto)
 			if (!BoardState.IsGameFinished)
 			{
+				// prosto: zaczyna host – można tu dodać bardziej skomplikowane zasady
 				BoardState.ActivePlayerNickname = host.PlayerNickname;
 			}
 
 			RecalculateStrengths();
 		}
 
-		private void ClearRows(PlayerBoardState player)
+		private void KeepRandomMonsterUnitOnBoard(PlayerBoardState monstersPlayer)
 		{
-			MoveRowToGraveyard(player, player.MeleeRow);
-			MoveRowToGraveyard(player, player.RangedRow);
-			MoveRowToGraveyard(player, player.SiegeRow);
-		}
-
-		private void MoveRowToGraveyard(PlayerBoardState player, List<GwentCard> row)
-		{
-			foreach (var card in row)
-			{
-				player.Graveyard.Add(card);
-			}
-			row.Clear();
-		}
-
-		private void SwitchTurnToOpponent(string currentPlayerNickname)
-		{
-			var currentPlayer = GetPlayerBoard(currentPlayerNickname);
-			var opponentPlayer = GetOpponentBoard(currentPlayerNickname);
-
-			// Jeśli przeciwnik już spasował, a bieżący gracz NIE spasował,
-			// to tura musi zostać przy bieżącym graczu (on dogrywa sam do końca rundy).
-			if (opponentPlayer.HasPassedCurrentRound && !currentPlayer.HasPassedCurrentRound)
-			{
-				BoardState.ActivePlayerNickname = currentPlayer.PlayerNickname;
-			}
-			else
-			{
-				// normalny przypadek – zmiana tury
-				BoardState.ActivePlayerNickname = opponentPlayer.PlayerNickname;
-			}
-		}
-
-		#endregion Pass / Resign / Leader
-
-		#region Scorch / Recalc
-
-		private void ApplyScorchEffectGlobal()
-		{
-			var allUnits = new List<(PlayerBoardState player, List<GwentCard> list, GwentCard card)>();
-
-			void Collect(PlayerBoardState p, List<GwentCard> row)
-			{
-				foreach (var c in row)
-				{
-					if (c.Category == CardCategory.Unit && !c.IsHero)
-						allUnits.Add((p, row, c));
-				}
-			}
-
-			Collect(BoardState.HostPlayerBoard, BoardState.HostPlayerBoard.MeleeRow);
-			Collect(BoardState.HostPlayerBoard, BoardState.HostPlayerBoard.RangedRow);
-			Collect(BoardState.HostPlayerBoard, BoardState.HostPlayerBoard.SiegeRow);
-
-			Collect(BoardState.GuestPlayerBoard, BoardState.GuestPlayerBoard.MeleeRow);
-			Collect(BoardState.GuestPlayerBoard, BoardState.GuestPlayerBoard.RangedRow);
-			Collect(BoardState.GuestPlayerBoard, BoardState.GuestPlayerBoard.SiegeRow);
+			var allUnits = monstersPlayer.EnumerateBoardCards()
+				.Where(c => c.Category == CardCategory.Unit && !c.IsHero)
+				.ToList();
 
 			if (!allUnits.Any())
 				return;
 
-			int maxStrength = allUnits.Max(x => x.card.CurrentStrength);
-			var toRemove = allUnits.Where(x => x.card.CurrentStrength == maxStrength).ToList();
+			var keep = allUnits[random.Next(allUnits.Count)];
 
-			foreach (var entry in toRemove)
-			{
-				entry.list.Remove(entry.card);
-				entry.player.Graveyard.Add(entry.card);
-			}
+			// wszystko inne w grave
+			var others = allUnits.Where(c => c.InstanceId != keep.InstanceId).ToList();
+			RemoveCardsFromBoardToGraveyard(monstersPlayer, others);
+
+			AddLogEntry($"{monstersPlayer.PlayerNickname}'s Monsters bonus keeps {keep.Name} on board.");
 		}
 
+		private void ClearRows(PlayerBoardState player)
+		{
+			MoveRowToGrave(player, player.MeleeRow);
+			MoveRowToGrave(player, player.RangedRow);
+			MoveRowToGrave(player, player.SiegeRow);
+		}
+
+		private void MoveRowToGrave(PlayerBoardState player, List<GwentCard> row)
+		{
+			foreach (var c in row)
+			{
+				c.IsOnBoard = false;
+				player.Graveyard.Add(c);
+			}
+			row.Clear();
+		}
+
+		#endregion
+
+		#region Przeliczanie siły
+
+		/// <summary>
+		/// Przelicza CurrentStrength wszystkich kart wg efektów (pogoda, bond, morale, horn, agile, scorch jeszcze nie).
+		/// </summary>
 		private void RecalculateStrengths()
 		{
-			void Reset(PlayerBoardState p)
+			// Najpierw reset do bazowej siły
+			foreach (var card in BoardState.HostPlayerBoard.EnumerateBoardCards()
+						 .Concat(BoardState.GuestPlayerBoard.EnumerateBoardCards()))
 			{
-				foreach (var c in p.MeleeRow.Concat(p.RangedRow).Concat(p.SiegeRow))
-				{
-					c.CurrentStrength = c.BaseStrength;
-				}
+				card.CurrentStrength = card.Definition.BaseStrength;
 			}
 
-			Reset(BoardState.HostPlayerBoard);
-			Reset(BoardState.GuestPlayerBoard);
+			ApplyWeatherModifiers(BoardState.HostPlayerBoard);
+			ApplyWeatherModifiers(BoardState.GuestPlayerBoard);
 
+			ApplyRowEffects(BoardState.HostPlayerBoard);
+			ApplyRowEffects(BoardState.GuestPlayerBoard);
+		}
+
+		private void ApplyWeatherModifiers(PlayerBoardState player)
+		{
 			bool frost = BoardState.WeatherCards.Any(c => c.HasAbility(CardAbilityType.WeatherBitingFrost));
 			bool fog = BoardState.WeatherCards.Any(c => c.HasAbility(CardAbilityType.WeatherImpenetrableFog));
 			bool rain = BoardState.WeatherCards.Any(c => c.HasAbility(CardAbilityType.WeatherTorrentialRain));
 
-			void ApplyWeatherToRow(List<GwentCard> row)
+			if (frost)
 			{
-				foreach (var c in row)
+				foreach (var c in player.MeleeRow.Where(c => !c.IsHero))
 				{
-					if (!c.IsHero && c.Category == CardCategory.Unit)
+					if (c.CurrentStrength > 1)
 						c.CurrentStrength = 1;
 				}
 			}
 
-			if (frost)
-			{
-				ApplyWeatherToRow(BoardState.HostPlayerBoard.MeleeRow);
-				ApplyWeatherToRow(BoardState.GuestPlayerBoard.MeleeRow);
-			}
-
 			if (fog)
 			{
-				ApplyWeatherToRow(BoardState.HostPlayerBoard.RangedRow);
-				ApplyWeatherToRow(BoardState.GuestPlayerBoard.RangedRow);
+				foreach (var c in player.RangedRow.Where(c => !c.IsHero))
+				{
+					if (c.CurrentStrength > 1)
+						c.CurrentStrength = 1;
+				}
 			}
 
 			if (rain)
 			{
-				ApplyWeatherToRow(BoardState.HostPlayerBoard.SiegeRow);
-				ApplyWeatherToRow(BoardState.GuestPlayerBoard.SiegeRow);
-			}
-
-			void ApplyHorn(PlayerBoardState p, List<GwentCard> row)
-			{
-				bool hornPresent = row.Any(c => c.HasAbility(CardAbilityType.CommandersHorn));
-				if (!hornPresent) return;
-
-				foreach (var c in row)
+				foreach (var c in player.SiegeRow.Where(c => !c.IsHero))
 				{
-					if (c.Category == CardCategory.Unit && !c.IsHero)
-						c.CurrentStrength *= 2;
+					if (c.CurrentStrength > 1)
+						c.CurrentStrength = 1;
 				}
 			}
-
-			ApplyHorn(BoardState.HostPlayerBoard, BoardState.HostPlayerBoard.MeleeRow);
-			ApplyHorn(BoardState.HostPlayerBoard, BoardState.HostPlayerBoard.RangedRow);
-			ApplyHorn(BoardState.HostPlayerBoard, BoardState.HostPlayerBoard.SiegeRow);
-
-			ApplyHorn(BoardState.GuestPlayerBoard, BoardState.GuestPlayerBoard.MeleeRow);
-			ApplyHorn(BoardState.GuestPlayerBoard, BoardState.GuestPlayerBoard.RangedRow);
-			ApplyHorn(BoardState.GuestPlayerBoard, BoardState.GuestPlayerBoard.SiegeRow);
-
-			void ApplyMorale(PlayerBoardState p, List<GwentCard> row)
-			{
-				int moraleCount = row.Count(c => c.HasAbility(CardAbilityType.MoralBoost));
-				if (moraleCount == 0) return;
-
-				foreach (var c in row)
-				{
-					if (!c.HasAbility(CardAbilityType.MoralBoost) &&
-						c.Category == CardCategory.Unit && !c.IsHero)
-					{
-						c.CurrentStrength += moraleCount;
-					}
-				}
-			}
-
-			ApplyMorale(BoardState.HostPlayerBoard, BoardState.HostPlayerBoard.MeleeRow);
-			ApplyMorale(BoardState.HostPlayerBoard, BoardState.HostPlayerBoard.RangedRow);
-			ApplyMorale(BoardState.HostPlayerBoard, BoardState.HostPlayerBoard.SiegeRow);
-
-			ApplyMorale(BoardState.GuestPlayerBoard, BoardState.GuestPlayerBoard.MeleeRow);
-			ApplyMorale(BoardState.GuestPlayerBoard, BoardState.GuestPlayerBoard.RangedRow);
-			ApplyMorale(BoardState.GuestPlayerBoard, BoardState.GuestPlayerBoard.SiegeRow);
-
-			void ApplyTightBond(List<GwentCard> row)
-			{
-				var groups = row
-					.Where(c => c.HasAbility(CardAbilityType.TightBond) && !string.IsNullOrEmpty(c.GroupId))
-					.GroupBy(c => c.GroupId!);
-
-				foreach (var g in groups)
-				{
-					int count = g.Count();
-					if (count <= 1) continue;
-
-					foreach (var c in g)
-					{
-						c.CurrentStrength *= count;
-					}
-				}
-			}
-
-			ApplyTightBond(BoardState.HostPlayerBoard.MeleeRow);
-			ApplyTightBond(BoardState.HostPlayerBoard.RangedRow);
-			ApplyTightBond(BoardState.HostPlayerBoard.SiegeRow);
-
-			ApplyTightBond(BoardState.GuestPlayerBoard.MeleeRow);
-			ApplyTightBond(BoardState.GuestPlayerBoard.RangedRow);
-			ApplyTightBond(BoardState.GuestPlayerBoard.SiegeRow);
 		}
 
-		#endregion Scorch / Recalc
+		private void ApplyRowEffects(PlayerBoardState player)
+		{
+			ApplyRowEffectsForRow(player.MeleeRow);
+			ApplyRowEffectsForRow(player.RangedRow);
+			ApplyRowEffectsForRow(player.SiegeRow);
+		}
+
+		private void ApplyRowEffectsForRow(List<GwentCard> row)
+		{
+			if (!row.Any())
+				return;
+
+			bool hasHorn = row.Any(c => c.HasAbility(CardAbilityType.CommandersHorn));
+			int moraleBoostCount = row.Count(c => c.HasAbility(CardAbilityType.MoralBoost));
+
+			// TightBond: dla każdej grupy mnożymy siłę kart w tej grupie przez ilość
+			var bondGroups = row
+				.Where(c => !string.IsNullOrEmpty(c.TightBondGroup))
+				.GroupBy(c => c.TightBondGroup);
+
+			foreach (var group in bondGroups)
+			{
+				int count = group.Count();
+				foreach (var card in group)
+				{
+					card.CurrentStrength *= count;
+				}
+			}
+
+			// Morale Boost – +1 do wszystkich innych jednostek (nie hero) w rzędzie
+			if (moraleBoostCount > 0)
+			{
+				foreach (var card in row.Where(c => !c.IsHero && !c.HasAbility(CardAbilityType.MoralBoost)))
+				{
+					card.CurrentStrength += moraleBoostCount;
+				}
+			}
+
+			// Horn – mnożenie siły w rzędzie (zwykle x2)
+			if (hasHorn)
+			{
+				foreach (var card in row.Where(c => !c.IsHero))
+				{
+					card.CurrentStrength *= 2;
+				}
+			}
+		}
+
+		#endregion
 	}
 }
