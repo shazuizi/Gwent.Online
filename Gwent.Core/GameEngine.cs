@@ -163,7 +163,6 @@
 			return true;
 		}
 
-
 		#region Init / helpers
 
 		private string DetermineStartingPlayerNickname()

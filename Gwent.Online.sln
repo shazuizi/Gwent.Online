@@ -9,6 +9,13 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gwent.Core", "Gwent.Core\Gw
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gwent.Client", "Gwent.Client\Gwent.Client.csproj", "{8314D03F-4F42-47FC-8572-16EBBCA09DC8}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "docs", "docs", "{7D7EE038-2483-4385-AC12-8B562F6B935A}"
+	ProjectSection(SolutionItems) = preProject
+		Gwent.Server_Documentation.md = Gwent.Server_Documentation.md
+		Gwent.Core_Documentation.md = Gwent.Core_Documentation.md
+		Roadmap.md = Roadmap.md
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU

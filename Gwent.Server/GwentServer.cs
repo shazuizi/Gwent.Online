@@ -310,7 +310,6 @@ namespace Gwent.Server
 			await BroadcastCurrentGameStateAsync(cancellationToken);
 		}
 
-
 		private async Task BroadcastCurrentGameStateAsync(CancellationToken cancellationToken)
 		{
 			if (gameEngine == null)
